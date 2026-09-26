@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { MODULES, moduleById } from './modules';
 import type { Activity } from './backend';
 import { Icon } from './icons';
+import { Hero, LocalNav } from './LocalNav';
 import { fmtDate, fmtTime } from './util';
 
 const VERB: Record<string, string> = {
@@ -37,7 +38,10 @@ function describeDetail(a: Activity) {
 export function ActivityLine({ a, showDate, onOpen }: { a: Activity; showDate?: boolean; onOpen?: () => void }) {
   const mod = moduleById(a.module);
   return (
-    <li className={'activity' + (onOpen && a.action !== 'hapus' ? ' clickable' : '')} onClick={a.action !== 'hapus' ? onOpen : undefined}>
+    <li
+      className={'activity' + (onOpen && a.action !== 'hapus' ? ' clickable' : '')}
+      onClick={a.action !== 'hapus' ? onOpen : undefined}
+    >
       <span className="avatar" title={a.userName}>
         {initials(a.userName)}
       </span>
@@ -50,13 +54,22 @@ export function ActivityLine({ a, showDate, onOpen }: { a: Activity; showDate?: 
       </span>
       <span className="meta">
         {mod && <span className="tag hide-sm">{mod.menu}</span>}
-        <span className="muted small">{showDate ? fmtDate(a.at) + ' ' : ''}{fmtTime(a.at)}</span>
+        <span className="muted small">
+          {showDate ? fmtDate(a.at) + ' ' : ''}
+          {fmtTime(a.at)}
+        </span>
       </span>
     </li>
   );
 }
 
-export function ActivityPage({ activity, go }: { activity: Activity[]; go: (m: Activity['module'], id?: string) => void }) {
+export function ActivityPage({
+  activity,
+  go,
+}: {
+  activity: Activity[];
+  go: (m: Activity['module'], id?: string) => void;
+}) {
   const [who, setWho] = useState('');
   const [mod, setMod] = useState('');
   const [q, setQ] = useState('');
@@ -79,19 +92,15 @@ export function ActivityPage({ activity, go }: { activity: Activity[]; go: (m: A
   }, [activity, who, mod, q]);
 
   return (
-    <section className="page">
-      <header className="page-head">
-        <div>
-          <h1>Riwayat Aktivitas</h1>
-          <p className="muted">
-            Setiap penambahan, perubahan, perpindahan tahap, dan penghapusan tercatat otomatis beserta akun yang
-            melakukannya.
-          </p>
-        </div>
-      </header>
+    <>
+      <LocalNav title="Riwayat" />
+      <section className="page">
+        <Hero
+          title="Riwayat aktivitas."
+          lead="Setiap penambahan, perubahan, perpindahan tahap, dan penghapusan tercatat otomatis beserta akunnya."
+        />
 
-      <div className="panel">
-        <div className="toolbar">
+        <div className="controls">
           <div className="search">
             <Search size={16} />
             <input type="search" placeholder="Cari…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -111,24 +120,26 @@ export function ActivityPage({ activity, go }: { activity: Activity[]; go: (m: A
             ))}
           </select>
         </div>
-        {groups.length === 0 ? (
-          <div className="empty">
-            <Icon name="aktivitas" size={24} />
-            <p>Belum ada aktivitas yang cocok.</p>
-          </div>
-        ) : (
-          groups.map(([day, items]) => (
-            <div key={day} className="day">
-              <h3 className="day-head">{day}</h3>
-              <ul className="list">
-                {items.map((a) => (
-                  <ActivityLine key={a.id} a={a} onOpen={a.recordId ? () => go(a.module, a.recordId) : undefined} />
-                ))}
-              </ul>
+        <div className="card">
+          {groups.length === 0 ? (
+            <div className="empty">
+              <Icon name="aktivitas" size={24} />
+              <p>Belum ada aktivitas yang cocok.</p>
             </div>
-          ))
-        )}
-      </div>
-    </section>
+          ) : (
+            groups.map(([day, items]) => (
+              <div key={day} className="day">
+                <h3 className="day-head">{day}</h3>
+                <ul className="list">
+                  {items.map((a) => (
+                    <ActivityLine key={a.id} a={a} onOpen={a.recordId ? () => go(a.module, a.recordId) : undefined} />
+                  ))}
+                </ul>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+    </>
   );
 }

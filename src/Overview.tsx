@@ -5,9 +5,10 @@ import { MODULES, UNITS, moduleById, type ModuleId } from './modules';
 import type { Activity, DataStore } from './backend';
 import { Icon } from './icons';
 import { Menu } from './Menu';
+import { Hero, LocalNav } from './LocalNav';
 import { ActivityLine } from './ActivityPage';
 import { ActivityBars, HBars, type DayBar } from './charts';
-import { daysSince, dueLabel, dueTone, fmtDate, isDone, lastMove } from './util';
+import { daysSince, dueLabel, dueTone, isDone, lastMove } from './util';
 import { collectReminders } from './reminders';
 
 interface Props {
@@ -75,18 +76,126 @@ export function Overview({ data, activity, loading, go }: Props) {
   }, [data.evp, evp, month]);
 
   const monthName = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  const totalActive = MODULES.reduce((n, m) => n + data[m.id].filter((r) => !isDone(m, r)).length, 0);
 
   return (
-    <section className="page">
-      <header className="page-head">
-        <div>
-          <h1>Ringkasan</h1>
-          <p className="muted">
+    <>
+      <LocalNav title="Ringkasan">
+        <Menu
+          triggerClass="pill-btn"
+          trigger={
+            <>
+              <Plus size={14} strokeWidth={2.4} /> Catat baru <ChevronDown size={13} className="hide-sm" />
+            </>
+          }
+          groups={[
+            MODULES.map((m) => ({
+              icon: <Icon name={m.icon} size={16} />,
+              label: m.menu,
+              hint: m.itemName,
+              run: () => go(m.id, 'baru'),
+            })),
+          ]}
+        />
+      </LocalNav>
+
+      <section className="page">
+        <Hero
+          title="Ringkasan."
+          sub={
+            attention.length
+              ? `${attention.length} hal perlu perhatian hari ini.`
+              : totalActive
+                ? `${totalActive} pekerjaan berjalan lancar.`
+                : 'Semua pekerjaan sudah selesai.'
+          }
+        >
+          <p className="hero-date">
             {now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
+        </Hero>
+
+        <div className="tiles">
+          {MODULES.map((m) => {
+            const rows = data[m.id];
+            const active = rows.filter((r) => !isDone(m, r)).length;
+            const thisMonth = rows.filter((r) => (r.values[m.dateField] ?? '').startsWith(month)).length;
+            const late = rows.filter((r) => !isDone(m, r) && daysSince(lastMove(r)) >= 3).length;
+            return (
+              <button key={m.id} className="tile" onClick={() => go(m.id)}>
+                <span className="tile-eyebrow">
+                  <Icon name={m.icon} size={16} /> {m.menu}
+                </span>
+                <span className="tile-num">{loading && !rows.length ? <span className="sk w30" /> : active}</span>
+                <span className="tile-text">
+                  sedang berjalan
+                  <span className="muted block">
+                    {thisMonth} tercatat bulan ini
+                    {late > 0 && <b className="tile-late"> · {late} tertahan</b>}
+                  </span>
+                </span>
+                <span className="tile-link">
+                  Buka <ChevronRight size={14} />
+                </span>
+              </button>
+            );
+          })}
         </div>
-        <div className="head-actions">
-          <div className="rekap">
+
+        <h2 className="section-title">
+          Perlu perhatian. <span>Tenggat dalam 3 hari dan pekerjaan yang tertahan.</span>
+        </h2>
+        <div className="card">
+          {attention.length === 0 ? (
+            <div className="card-empty">
+              <CheckCircle2 size={22} className="ok" />
+              <span>Tidak ada tenggat atau pekerjaan yang tertahan. Kerja bagus.</span>
+            </div>
+          ) : (
+            <ul className="list">
+              {attention.slice(0, 8).map(({ m, r, tone, note }) => (
+                <li key={r.id} className="clickable" onClick={() => go(m.id, r.id)}>
+                  <span className="list-icon">
+                    <Icon name={m.icon} size={17} />
+                  </span>
+                  <span className="grow">
+                    <span className="ellipsis block list-title">{label(r.values) || m.itemName}</span>
+                    <span className="muted ellipsis block list-sub">
+                      {m.menu} · {r.status}
+                    </span>
+                  </span>
+                  <span className={'due ' + tone}>{note}</span>
+                  <ChevronRight size={16} className="list-chev" />
+                </li>
+              ))}
+            </ul>
+          )}
+          {attention.length > 8 && <p className="card-more muted">dan {attention.length - 8} lainnya</p>}
+        </div>
+
+        <h2 className="section-title">
+          Laporan. <span>Angka dan grafik untuk {monthName}.</span>
+        </h2>
+        <div className="bento">
+          <div className="card pad span-2">
+            <div className="card-head">
+              <div>
+                <h3>Aktivitas 14 hari terakhir</h3>
+                <p className="muted small">Pencatatan, perubahan, dan perpindahan tahap per hari</p>
+              </div>
+              <button className="link" onClick={() => go('aktivitas')}>
+                Riwayat <ChevronRight size={14} />
+              </button>
+            </div>
+            <ActivityBars data={days} />
+          </div>
+
+          <div className="card pad rekap-card">
+            <span className="rekap-icon">
+              <FileSpreadsheet size={26} strokeWidth={1.6} />
+            </span>
+            <h3>Rekap bulanan</h3>
+            <p className="muted small">Semua menu dalam satu file Excel, satu lembar per menu.</p>
             <input
               type="month"
               value={rekapMonth}
@@ -94,181 +203,91 @@ export function Overview({ data, activity, loading, go }: Props) {
               onChange={(e) => setRekapMonth(e.target.value)}
               aria-label="Bulan rekap"
             />
-            <button className="btn" onClick={() => rekapMonth && exportRekap(data, rekapMonth)} disabled={!rekapMonth}>
-              <FileSpreadsheet size={16} /> <span className="hide-sm">Unduh rekap</span>
+            <button className="pill-btn big" onClick={() => rekapMonth && exportRekap(data, rekapMonth)} disabled={!rekapMonth}>
+              Unduh Excel
             </button>
           </div>
-          <Menu
-            triggerClass="btn primary"
-            trigger={
-              <>
-                <Plus size={16} /> Catat baru <ChevronDown size={14} />
-              </>
-            }
-            groups={[
-              MODULES.map((m) => ({
-                icon: <Icon name={m.icon} size={16} />,
-                label: m.menu,
-                hint: m.itemName,
-                run: () => go(m.id, 'baru'),
-              })),
-            ]}
-          />
+
+          <div className="card pad">
+            <div className="card-head">
+              <div>
+                <h3>TTD EVP per unit</h3>
+                <p className="muted small">Dokumen yang belum kembali ke unit</p>
+              </div>
+              <button className="link" onClick={() => go('evp')}>
+                Buka <ChevronRight size={14} />
+              </button>
+            </div>
+            {evpActive.length === 0 ? (
+              <p className="muted small">Tidak ada dokumen yang sedang menunggu.</p>
+            ) : (
+              <div className="table-wrap">
+                <table className="mini">
+                  <thead>
+                    <tr>
+                      <th>Unit</th>
+                      {evp.statuses.slice(0, -1).map((s) => (
+                        <th key={s} className="num">
+                          {s}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {UNITS.map((u) => {
+                      const rows = evpActive.filter((r) => r.values.unit === u);
+                      if (!rows.length) return null;
+                      return (
+                        <tr key={u}>
+                          <td>{u}</td>
+                          {evp.statuses.slice(0, -1).map((s) => {
+                            const n = rows.filter((r) => r.status === s).length;
+                            return (
+                              <td key={s} className="num">
+                                {n || <span className="muted">–</span>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="card pad span-2">
+            <div className="card-head">
+              <div>
+                <h3>Jenis dokumen TTD EVP</h3>
+                <p className="muted small">Masuk pada {monthName}</p>
+              </div>
+            </div>
+            {byJenis.length === 0 ? <p className="muted small">Belum ada dokumen bulan ini.</p> : <HBars data={byJenis} />}
+          </div>
         </div>
-      </header>
 
-      <div className="kpis">
-        {MODULES.map((m) => {
-          const rows = data[m.id];
-          const active = rows.filter((r) => !isDone(m, r)).length;
-          const thisMonth = rows.filter((r) => (r.values[m.dateField] ?? '').startsWith(month)).length;
-          const late = rows.filter((r) => !isDone(m, r) && daysSince(lastMove(r)) >= 3).length;
-          return (
-            <button key={m.id} className="kpi" onClick={() => go(m.id)}>
-              <span className="kpi-label">
-                <Icon name={m.icon} size={15} /> {m.menu}
-              </span>
-              <span className="kpi-num">{loading && !rows.length ? <span className="sk w30" /> : active}</span>
-              <span className="kpi-sub">
-                berjalan · {thisMonth} bulan ini
-                {late > 0 && <b className="kpi-late"> · {late} tertahan</b>}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="grid-main">
-        <div className="panel">
-          <div className="panel-head">
-            <div>
-              <h2>Perlu perhatian</h2>
-              <p className="muted small">Tenggat dalam 3 hari dan pekerjaan yang tertahan 3 hari atau lebih</p>
-            </div>
-            {attention.length > 0 && <span className="count-badge">{attention.length}</span>}
-          </div>
-          {attention.length === 0 ? (
-            <div className="panel-empty">
-              <CheckCircle2 size={18} className="ok" /> Tidak ada tenggat atau pekerjaan yang tertahan.
-            </div>
+        <h2 className="section-title">
+          Terbaru. <span>Siapa mengerjakan apa.</span>
+        </h2>
+        <div className="card">
+          {activity.length === 0 ? (
+            <div className="card-empty">Belum ada aktivitas.</div>
           ) : (
             <ul className="list">
-              {attention.slice(0, 7).map(({ m, r, tone, note }) => (
-                <li key={r.id} className="clickable" onClick={() => go(m.id, r.id)}>
-                  <span className="grow">
-                    <span className="ellipsis block list-title">{label(r.values) || m.itemName}</span>
-                    <span className="muted small ellipsis block">
-                      {m.menu} · {r.status}
-                    </span>
-                  </span>
-                  <span className={'due ' + tone}>{note}</span>
-                </li>
+              {activity.slice(0, 6).map((a) => (
+                <ActivityLine key={a.id} a={a} onOpen={a.recordId ? () => go(a.module, a.recordId) : undefined} />
               ))}
             </ul>
           )}
-          {attention.length > 7 && <p className="panel-more muted small">dan {attention.length - 7} lainnya</p>}
-        </div>
-
-        <div className="panel">
-          <div className="panel-head">
-            <div>
-              <h2>Aktivitas 14 hari terakhir</h2>
-              <p className="muted small">Pencatatan, perubahan, dan perpindahan tahap per hari</p>
-            </div>
+          <p className="card-more">
             <button className="link" onClick={() => go('aktivitas')}>
-              Riwayat <ChevronRight size={14} />
+              Lihat semua riwayat <ChevronRight size={14} />
             </button>
-          </div>
-          <div className="panel-body">
-            <ActivityBars data={days} />
-          </div>
+          </p>
         </div>
-      </div>
-
-      <div className="grid-2">
-        <div className="panel">
-          <div className="panel-head">
-            <div>
-              <h2>TTD EVP per unit</h2>
-              <p className="muted small">Dokumen yang belum kembali ke unit</p>
-            </div>
-            <button className="link" onClick={() => go('evp')}>
-              Buka <ChevronRight size={14} />
-            </button>
-          </div>
-          {evpActive.length === 0 ? (
-            <div className="panel-empty">Tidak ada dokumen yang sedang menunggu.</div>
-          ) : (
-            <div className="table-wrap">
-              <table className="mini">
-                <thead>
-                  <tr>
-                    <th>Unit</th>
-                    {evp.statuses.slice(0, -1).map((s) => (
-                      <th key={s} className="num">
-                        {s}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {UNITS.map((u) => {
-                    const rows = evpActive.filter((r) => r.values.unit === u);
-                    if (!rows.length) return null;
-                    return (
-                      <tr key={u}>
-                        <td>{u}</td>
-                        {evp.statuses.slice(0, -1).map((s) => {
-                          const n = rows.filter((r) => r.status === s).length;
-                          return (
-                            <td key={s} className="num">
-                              {n || <span className="muted">–</span>}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        <div className="panel">
-          <div className="panel-head">
-            <div>
-              <h2>Jenis dokumen TTD EVP</h2>
-              <p className="muted small">Masuk pada {monthName}</p>
-            </div>
-          </div>
-          {byJenis.length === 0 ? (
-            <div className="panel-empty">Belum ada dokumen bulan ini.</div>
-          ) : (
-            <div className="panel-body">
-              <HBars data={byJenis} />
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="panel-head">
-          <h2>Aktivitas terakhir</h2>
-          <button className="link" onClick={() => go('aktivitas')}>
-            Semua riwayat <ChevronRight size={14} />
-          </button>
-        </div>
-        {activity.length === 0 ? (
-          <div className="panel-empty">Belum ada aktivitas.</div>
-        ) : (
-          <ul className="list">
-            {activity.slice(0, 6).map((a) => (
-              <ActivityLine key={a.id} a={a} onOpen={a.recordId ? () => go(a.module, a.recordId) : undefined} />
-            ))}
-          </ul>
-        )}
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

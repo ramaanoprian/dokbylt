@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight, ChevronsUpDown, CloudOff, Download, FileText, KeyRound, LogOut, Menu as Menu2, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
+import { Download, FileText, KeyRound, LogOut, Menu as Menu2, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
 import { Menu } from './Menu';
 import { MODULES, moduleById, type ModuleId } from './modules';
 import { isOnline, useBackend, type DataStore } from './backend';
-import { Icon } from './icons';
 import { ModulePage } from './ModulePage';
 import { Overview } from './Overview';
 import { ActivityPage, initials } from './ActivityPage';
@@ -46,8 +45,13 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#161a22' : '#ffffff');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#000000' : '#f5f5f7');
   }, [dark]);
+
+  // Menu layar penuh di HP: halaman di belakangnya tidak ikut bergulir.
+  useEffect(() => {
+    document.documentElement.classList.toggle('lock', navOpen);
+  }, [navOpen]);
 
   const toggleTheme = useCallback(() => {
     setDark((d) => {
@@ -125,169 +129,159 @@ export default function App() {
     alert(err ? 'Gagal mengganti kata sandi: ' + err : 'Kata sandi berhasil diganti.');
   };
 
-  const navItem = (id: Page, icon: Parameters<typeof Icon>[0]['name'], text: string, count?: number) => (
-    <button key={id} className={page === id ? 'active' : ''} onClick={() => go(id)} aria-current={page === id ? 'page' : undefined}>
-      <Icon name={icon} size={17} />
-      <span className="grow">{text}</span>
-      {!!count && <span className="count">{count}</span>}
-    </button>
-  );
+  const links: [Page, string][] = [
+    ['ringkasan', 'Ringkasan'],
+    ...MODULES.map((m): [Page, string] => [m.id, m.menu]),
+    ['aktivitas', 'Riwayat'],
+  ];
 
-  const pageName = page === 'ringkasan' ? 'Ringkasan' : page === 'aktivitas' ? 'Riwayat Aktivitas' : moduleById(page).menu;
+  const accountItems = [
+    [
+      { icon: dark ? <Sun size={16} /> : <Moon size={16} />, label: dark ? 'Tampilan terang' : 'Tampilan gelap', run: toggleTheme },
+      { icon: <Download size={16} />, label: 'Unduh cadangan data', run: () => exportJson(data) },
+      ...(!isOnline ? [{ icon: <Upload size={16} />, label: 'Pulihkan dari cadangan', run: () => fileRef.current?.click() }] : []),
+    ],
+    isOnline && be.isAdmin ? [{ icon: <Users size={16} />, label: 'Kelola peran staf', run: () => setStaffOpen(true) }] : [],
+    isOnline
+      ? [
+          { icon: <KeyRound size={16} />, label: 'Ganti kata sandi', run: changePassword },
+          { icon: <LogOut size={16} />, label: 'Keluar', run: be.signOut, danger: true },
+        ]
+      : [],
+  ];
 
-  const accountMenu = (
-    <Menu
-      up
-      align="left"
-      wide
-      triggerClass="account"
-      title="Akun dan pengaturan"
-      trigger={
-        <>
-          <span className="avatar">{initials(userName)}</span>
-          <span className="grow">
-            <b>{userName}</b>
-            <span className="small muted">{be.isAdmin ? 'Admin' : 'Staf'} · Unit Dokumen</span>
-          </span>
-          <ChevronsUpDown size={15} className="muted" />
-        </>
-      }
-      groups={[
-        [
-          { icon: dark ? <Sun size={16} /> : <Moon size={16} />, label: dark ? 'Tampilan terang' : 'Tampilan gelap', run: toggleTheme },
-          { icon: <Download size={16} />, label: 'Unduh cadangan data', run: () => exportJson(data) },
-          ...(!isOnline ? [{ icon: <Upload size={16} />, label: 'Pulihkan dari cadangan', run: () => fileRef.current?.click() }] : []),
-        ],
-        isOnline && be.isAdmin ? [{ icon: <Users size={16} />, label: 'Kelola peran staf', run: () => setStaffOpen(true) }] : [],
-        isOnline
-          ? [
-              { icon: <KeyRound size={16} />, label: 'Ganti kata sandi', run: changePassword },
-              { icon: <LogOut size={16} />, label: 'Keluar', run: be.signOut, danger: true },
-            ]
-          : [],
-      ]}
-    />
+  const who = (
+    <div className="who">
+      <span className="avatar">{initials(userName)}</span>
+      <span className="grow">
+        <b>{userName}</b>
+        <span className="muted small block">
+          {be.isAdmin ? 'Admin' : 'Staf'} · {isOnline ? 'Tersinkron' : 'Mode lokal, data hanya di browser ini'}
+        </span>
+      </span>
+    </div>
   );
 
   return (
-    <div className={'layout' + (navOpen ? ' nav-open' : '')}>
-      <aside className="sidebar">
-        <div className="brand">
-          <span className="logo" aria-hidden>
-            <FileText size={16} strokeWidth={2.2} />
-          </span>
-          <div className="grow">
-            <strong>Dokumen BYLT</strong>
-            <span className="brand-sub">Balai Yasa Lahat</span>
+    <div className={'app' + (navOpen ? ' nav-open' : '')}>
+      <header className="gnav">
+        <div className="gnav-inner">
+          <button className="gnav-logo" onClick={() => go('ringkasan')} aria-label="Dokumen BYLT, ke Ringkasan">
+            <span className="logo" aria-hidden>
+              <FileText size={13} strokeWidth={2.4} />
+            </span>
+            <span>Dokumen BYLT</span>
+          </button>
+          <nav className="gnav-links" aria-label="Menu utama">
+            {links.map(([id, text]) => (
+              <button key={id} className={page === id ? 'on' : ''} aria-current={page === id ? 'page' : undefined} onClick={() => go(id)}>
+                {text}
+              </button>
+            ))}
+          </nav>
+          <div className="gnav-tools">
+            <button className="icon-btn" onClick={() => setPaletteOpen(true)} aria-label="Cari (Ctrl K)" title="Cari (Ctrl K)">
+              <Search size={17} />
+            </button>
+            <ReminderBell items={reminders} go={go} />
+            <span className="hide-sm">
+              <Menu
+                triggerClass="avatar-btn"
+                title="Akun dan pengaturan"
+                trigger={<span className="avatar">{initials(userName)}</span>}
+                header={who}
+                groups={accountItems}
+              />
+            </span>
+            <button className="icon-btn only-mobile burger" onClick={() => setNavOpen(!navOpen)} aria-label={navOpen ? 'Tutup menu' : 'Buka menu'} aria-expanded={navOpen}>
+              {navOpen ? <X size={20} /> : <Menu2 size={20} />}
+            </button>
           </div>
-          <button className="icon-btn only-mobile" onClick={() => setNavOpen(false)} aria-label="Tutup menu">
-            <X size={20} />
+        </div>
+      </header>
+
+      {navOpen && (
+        <div className="gnav-sheet">
+          <nav>
+            {links.map(([id, text]) => (
+              <button key={id} className={page === id ? 'on' : ''} onClick={() => go(id)}>
+                {text}
+                {id !== 'ringkasan' && id !== 'aktivitas' && !!data[id].filter((r) => !isDone(moduleById(id), r)).length && (
+                  <span className="sheet-count">{data[id].filter((r) => !isDone(moduleById(id), r)).length}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+          <div className="sheet-account">
+            {who}
+            {accountItems.flat().map((it) => (
+              <button
+                key={it.label}
+                className={'sheet-link' + ('danger' in it && it.danger ? ' danger' : '')}
+                onClick={() => {
+                  setNavOpen(false);
+                  it.run();
+                }}
+              >
+                {it.icon} {it.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) importBackup(f);
+          e.target.value = '';
+        }}
+      />
+
+      {be.error && (
+        <div className="toast" role="alert">
+          {be.error}
+          <button className="icon-btn" onClick={be.clearError} aria-label="Tutup">
+            <X size={16} />
           </button>
         </div>
-
-        <nav>
-          {navItem('ringkasan', 'ringkasan', 'Ringkasan')}
-          <p className="nav-label">Alur kerja</p>
-          {MODULES.map((m) =>
-            navItem(m.id, m.icon, m.menu, data[m.id].filter((r) => !isDone(m, r)).length),
-          )}
-          <p className="nav-label">Lainnya</p>
-          {navItem('aktivitas', 'aktivitas', 'Riwayat Aktivitas')}
-        </nav>
-
-        <div className="sidebar-foot">
-          {isOnline ? (
-            <div className="sync" title="Perubahan dari perangkat lain muncul otomatis">
-              <span className="sync-dot" /> Tersinkron
-            </div>
-          ) : (
-            <div className="sync local">
-              <CloudOff size={14} /> Mode lokal, data hanya di browser ini
-            </div>
-          )}
-          {accountMenu}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) importBackup(f);
-              e.target.value = '';
-            }}
+      )}
+      <main>
+        {be.loading && <div className="loading-bar" />}
+        {page === 'ringkasan' ? (
+          <Overview data={data} activity={be.activity} loading={be.loading} go={go} />
+        ) : page === 'aktivitas' ? (
+          <ActivityPage activity={be.activity} go={go} />
+        ) : (
+          <ModulePage
+            key={page}
+            mod={moduleById(page)}
+            rows={data[page]}
+            userName={userName}
+            loading={be.loading}
+            openId={openId}
+            onOpened={clearOpen}
+            onSave={(r, prev) => be.save(page, r, prev)}
+            onDelete={(r) => be.remove(page, r)}
+            onRestore={(r) => be.save(page, r)}
+            onImport={(recs) => be.saveMany(page, recs)}
+            canDelete={be.isAdmin}
+            files={files}
           />
-        </div>
-      </aside>
-
-      <div className="main">
-        <header className="topbar">
-          <button className="icon-btn only-mobile" onClick={() => setNavOpen(true)} aria-label="Menu">
-            <Menu2 size={20} />
-          </button>
-          <div className="crumbs">
-            <span className="hide-sm">Unit Dokumen</span>
-            <ChevronRight size={14} className="hide-sm muted" />
-            <b>{pageName}</b>
-          </div>
-          <span className="push" />
-          <button className="search-trigger" onClick={() => setPaletteOpen(true)} aria-label="Cari">
-            <Search size={15} />
-            <span className="hide-sm">Cari dokumen, surat, resi…</span>
-            <kbd className="hide-sm">Ctrl K</kbd>
-          </button>
-          <ReminderBell items={reminders} go={go} />
-        </header>
-        {be.error && (
-          <div className="toast" role="alert">
-            {be.error}
-            <button className="icon-btn" onClick={be.clearError} aria-label="Tutup">
-              <X size={16} />
-            </button>
-          </div>
         )}
-        <main>
-          {be.loading && <div className="loading-bar" />}
-          {page === 'ringkasan' ? (
-            <Overview data={data} activity={be.activity} loading={be.loading} go={go} />
-          ) : page === 'aktivitas' ? (
-            <ActivityPage activity={be.activity} go={go} />
-          ) : (
-            <ModulePage
-              key={page}
-              mod={moduleById(page)}
-              rows={data[page]}
-              userName={userName}
-              loading={be.loading}
-              openId={openId}
-              onOpened={clearOpen}
-              onSave={(r, prev) => be.save(page, r, prev)}
-              onDelete={(r) => be.remove(page, r)}
-              onRestore={(r) => be.save(page, r)}
-              onImport={(recs) => be.saveMany(page, recs)}
-              canDelete={be.isAdmin}
-              files={files}
-            />
-          )}
-        </main>
-      </div>
-      <nav className="bottom-nav" aria-label="Navigasi">
-        {(['ringkasan', 'evp', 'surat', 'pos'] as const).map((p) => {
-          const icon = p === 'ringkasan' ? 'ringkasan' : moduleById(p).icon;
-          const text = p === 'ringkasan' ? 'Ringkasan' : p === 'surat' ? 'Surat' : moduleById(p).menu;
-          return (
-            <button key={p} className={page === p ? 'active' : ''} onClick={() => go(p)}>
-              <Icon name={icon} size={20} />
-              <span>{text}</span>
-            </button>
-          );
-        })}
-        <button onClick={() => setNavOpen(true)}>
-          <Menu2 size={20} />
-          <span>Lainnya</span>
-        </button>
-      </nav>
-      {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
+      </main>
+      <footer className="gfoot">
+        <div className="gfoot-inner">
+          <span>Unit Dokumen · Balai Yasa Lahat</span>
+          <span className="muted">
+            {isOnline ? 'Data tersinkron otomatis antarperangkat.' : 'Mode lokal: data hanya tersimpan di browser ini.'}
+          </span>
+        </div>
+      </footer>
       {staffOpen && (
         <StaffDialog meId={be.user.id} load={be.listStaff} setRole={be.setStaffRole} onClose={closeStaff} />
       )}

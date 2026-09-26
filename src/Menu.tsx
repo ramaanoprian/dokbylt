@@ -19,10 +19,12 @@ interface Props {
   /** Buka ke atas (untuk menu di bagian bawah sidebar). */
   up?: boolean;
   wide?: boolean;
+  /** Isi di atas daftar item (misalnya nama akun). */
+  header?: ReactNode;
 }
 
 /** Menu tarik-turun sederhana: klik di luar atau Esc untuk menutup. */
-export function Menu({ trigger, triggerClass = 'btn', title, groups, align = 'right', up, wide }: Props) {
+export function Menu({ trigger, triggerClass = 'btn', title, groups, align = 'right', up, wide, header }: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -53,6 +55,7 @@ export function Menu({ trigger, triggerClass = 'btn', title, groups, align = 'ri
       </button>
       {open && (
         <div className={`menu-pop ${align}${up ? ' up' : ''}`} role="menu">
+          {header && <div className="menu-header">{header}</div>}
           {shown.map((g, gi) => (
             <div key={gi} className="menu-group">
               {g.map((it) => (
