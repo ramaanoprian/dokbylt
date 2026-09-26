@@ -30,13 +30,18 @@ export interface ModuleDef {
   dateField: string;
   /** Tenggat bawaan: sekian hari kerja setelah tanggal utama. Tetap bisa diubah di form. */
   dueDays?: number;
-  /** Tahap yang memicu pesan WA ke PIC unit (nomor di field `kontakPic`). */
+  /** Tahap yang memicu pesan WA ke PIC unit (nomor di field `kontakPic`), digabung per nomor. */
   notifyStatus?: string;
+  /** Tahap-tahap yang langsung memicu WA ke peminjam (tanpa digabung). */
+  notifyOn?: string[];
 }
 
-export type ModuleId = 'evp' | 'surat' | 'keluar' | 'pos' | 'multimedia' | 'arsip';
+export type ModuleId = 'evp' | 'surat' | 'keluar' | 'pos' | 'multimedia' | 'arsip' | 'drone';
 
 export const UNITS = ['Rencana', 'Logistik', 'Keuangan', 'SDM', 'Dokumen', 'Lainnya'];
+/** Unit yang biasa meminjam drone. */
+export const DRONE_UNITS = ['SDM', 'Quality Control', 'Fasilitas', 'Rencana', 'Logistik', 'Keuangan', 'Lainnya'];
+export const DRONE_STATUSES = ['Diajukan', 'Disetujui', 'Dipinjam', 'Dikembalikan'];
 
 /** Pilihan yang mewajibkan keterangan tambahan. */
 export const OTHER = 'Lainnya';
@@ -218,6 +223,44 @@ export const MODULES: ModuleDef[] = [
     ],
     statuses: ['Diajukan unit', 'Diterima & diverifikasi', 'Disimpan di depo'],
     requiredForStatus: { 'Disimpan di depo': ['lokasi'] },
+  },
+  {
+    id: 'drone',
+    notifyOn: ['Disetujui', 'Dipinjam', 'Dikembalikan'],
+    title: 'Peminjaman Drone',
+    menu: 'Drone',
+    description:
+      'Unit mengajukan lewat formulir (QR), unit dokumen menyetujui dan mengantar atau menyiapkan drone, lalu peminjam menandai saat mengambil dan mengembalikan.',
+    icon: 'drone',
+    itemName: 'peminjaman',
+    dateField: 'tanggalPakai',
+    fields: [
+      { key: 'tanggalPakai', label: 'Tanggal pakai', type: 'date', required: true, inTable: true },
+      { key: 'tanggalKembali', label: 'Rencana kembali', type: 'date', inTable: true },
+      { key: 'unit', label: 'Unit peminjam', type: 'select', options: DRONE_UNITS, required: true, inTable: true },
+      { key: 'pic', label: 'Nama peminjam', type: 'text', required: true, inTable: true },
+      {
+        key: 'kontakPic',
+        label: 'No. WA peminjam',
+        type: 'text',
+        required: true,
+        placeholder: '08…',
+        hint: 'Peminjam dikabari lewat WA di setiap tahap',
+      },
+      { key: 'keperluan', label: 'Keperluan', type: 'text', required: true, inTable: true },
+      { key: 'lokasi', label: 'Lokasi terbang', type: 'text' },
+      {
+        key: 'serah',
+        label: 'Penyerahan drone',
+        type: 'select',
+        options: ['Diantar ke unit', 'Diambil di Unit Dokumen'],
+        inTable: true,
+      },
+      { key: 'kondisi', label: 'Kondisi saat kembali', type: 'select', options: ['Baik', 'Perlu dicek', 'Rusak'] },
+      { key: 'catatan', label: 'Catatan', type: 'textarea' },
+    ],
+    statuses: DRONE_STATUSES,
+    requiredForStatus: { Disetujui: ['serah'] },
   },
 ];
 

@@ -20,7 +20,7 @@ interface Props {
   go: (id: ModuleId | 'aktivitas', openId?: string) => void;
 }
 
-const label = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.tujuan || v.asal || '';
+const label = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.keperluan || v.tujuan || v.asal || '';
 const dayKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 

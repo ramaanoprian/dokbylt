@@ -70,7 +70,7 @@ export function attachmentsOf(values: Record<string, string>): Attachment[] {
   }
 }
 
-const EMPTY: DataStore = { evp: [], surat: [], keluar: [], pos: [], multimedia: [], arsip: [] };
+const EMPTY: DataStore = { evp: [], surat: [], keluar: [], pos: [], multimedia: [], arsip: [], drone: [] };
 const ACTIVITY_LIMIT = 500;
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -79,17 +79,24 @@ const supabase: SupabaseClient | null = url && key ? createClient(url, key) : nu
 
 export type NotifyResult = { sent: true; target: string } | { sent: false; reason: string };
 
-/** Perlu mengabari PIC lewat WA: baru masuk ke tahap pemicu dan nomor PIC terisi. */
-function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord) {
+export type NotifyKind = 'batch' | 'instant' | false;
+
+/**
+ * Perlu mengabari lewat WA? "batch": PIC dokumen TTD EVP, digabung per nomor.
+ * "instant": peminjam drone, dikabari langsung setiap masuk tahap tertentu.
+ */
+function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord): NotifyKind {
   const def = moduleById(mod);
-  if (!def?.notifyStatus || !waNumber(rec.values.kontakPic)) return false;
+  if (!def || !waNumber(rec.values.kontakPic)) return false;
+  if (def.notifyOn) return def.notifyOn.includes(rec.status) && prev?.status !== rec.status ? 'instant' : false;
+  if (!def.notifyStatus) return false;
   // Kirim saat data melewati tahap itu, juga bila staf langsung melompat ke tahap sesudahnya.
   const target = def.statuses.indexOf(def.notifyStatus);
   const now = def.statuses.indexOf(rec.status);
   if (now < target) return false;
-  if (prev) return def.statuses.indexOf(prev.status) < target;
+  if (prev) return def.statuses.indexOf(prev.status) < target ? 'batch' : false;
   // Data baru (bukan data terhapus yang dikembalikan, yang sudah punya riwayat panjang).
-  return rec.history.length <= 1;
+  return rec.history.length <= 1 ? 'batch' : false;
 }
 
 // Token sesi disimpan di sini agar WA yang masih antre tetap bisa dikirim saat halaman ditutup.
@@ -103,19 +110,33 @@ supabase?.auth.onAuthStateChange((_e, s) => {
  * yang sama digabung server menjadi satu pesan berisi daftar.
  */
 export async function sendNotify(ids: string[], keepalive = false): Promise<NotifyResult> {
-  if (!supabase || !url || !key) return { sent: false, reason: 'mode lokal' };
+  const r = await callFunction('kabari-pic', { ids }, keepalive);
+  return r.ok ? { sent: true, target: String(r.data.target ?? '') } : { sent: false, reason: r.error };
+}
+
+/** Kabari peminjam drone sesuai tahapnya sekarang (dipanggil setelah staf memindah tahap). */
+export async function sendDroneNotify(id: string): Promise<NotifyResult> {
+  const r = await callFunction('pinjam-drone', { action: 'kabari', id });
+  return r.ok ? { sent: true, target: String(r.data.target ?? '') } : { sent: false, reason: r.error };
+}
+
+type FnResult = { ok: true; data: Record<string, unknown> } | { ok: false; error: string; data?: Record<string, unknown> };
+
+/** Memanggil fungsi server Supabase. Tanpa login pun bisa (untuk formulir publik). */
+export async function callFunction(name: string, body: unknown, keepalive = false): Promise<FnResult> {
+  if (!url || !key) return { ok: false, error: 'mode lokal' };
   try {
-    const res = await fetch(`${url}/functions/v1/kabari-pic`, {
+    const res = await fetch(`${url}/functions/v1/${name}`, {
       method: 'POST',
       keepalive,
       headers: { Authorization: `Bearer ${accessToken || key}`, apikey: key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids }),
+      body: JSON.stringify(body),
     });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) return { sent: false, reason: body?.error || `server menolak (${res.status})` };
-    return { sent: true, target: body?.target ?? '' };
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return { ok: false, error: data?.error || `server menolak (${res.status})`, data };
+    return { ok: true, data };
   } catch {
-    return { sent: false, reason: 'tidak ada koneksi' };
+    return { ok: false, error: 'tidak ada koneksi' };
   }
 }
 
@@ -184,7 +205,7 @@ const toUser = (s: Session | null): AppUser | null =>
     : null;
 
 function groupRows(rows: RecordRow[]): DataStore {
-  const out: DataStore = { evp: [], surat: [], keluar: [], pos: [], multimedia: [], arsip: [] };
+  const out: DataStore = { evp: [], surat: [], keluar: [], pos: [], multimedia: [], arsip: [], drone: [] };
   for (const r of rows) if (out[r.module]) out[r.module].push(fromRow(r));
   return out;
 }
@@ -201,7 +222,7 @@ function withoutRecord(d: DataStore, id: string): DataStore {
   return out;
 }
 
-const labelOf = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.tujuan || v.asal || '';
+const labelOf = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.keperluan || v.tujuan || v.asal || '';
 
 // ---------- Mode lokal (tanpa server) ----------
 
@@ -339,7 +360,10 @@ export function useBackend() {
     );
 
   const save = useCallback(
-    async (mod: ModuleId, rec: DocRecord, prev?: DocRecord): Promise<boolean> => {
+    async (mod: ModuleId, rec: DocRecord, prev?: DocRecord): Promise<NotifyKind> => {
+      // Peminjaman drone butuh token rahasia untuk tautan konfirmasi di WA peminjam.
+      if (mod === 'drone' && !prev && !rec.values.token)
+        rec = { ...rec, values: { ...rec.values, token: crypto.randomUUID().replace(/-/g, '') } };
       setData((d) => withRecord(d, mod, rec));
       const notify = shouldNotify(mod, rec, prev);
       if (!supabase) {

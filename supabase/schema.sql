@@ -3,7 +3,7 @@
 
 create table if not exists public.records (
   id uuid primary key default gen_random_uuid(),
-  module text not null check (module in ('evp', 'surat', 'keluar', 'pos', 'multimedia', 'arsip')),
+  module text not null check (module in ('evp', 'surat', 'keluar', 'pos', 'multimedia', 'arsip', 'drone')),
   status text not null,
   values jsonb not null default '{}'::jsonb,
   history jsonb not null default '[]'::jsonb,
@@ -42,7 +42,7 @@ $$;
 
 create or replace function public.record_label(v jsonb) returns text
 language sql immutable as $$
-  select coalesce(v ->> 'perihal', v ->> 'kegiatan', v ->> 'uraian', v ->> 'tujuan', v ->> 'asal', '');
+  select coalesce(v ->> 'perihal', v ->> 'kegiatan', v ->> 'uraian', v ->> 'keperluan', v ->> 'tujuan', v ->> 'asal', '');
 $$;
 
 create or replace function public.log_record_change() returns trigger
@@ -123,7 +123,7 @@ end $$;
 -- 1. Menu Surat Keluar
 alter table public.records drop constraint if exists records_module_check;
 alter table public.records add constraint records_module_check
-  check (module in ('evp', 'surat', 'keluar', 'pos', 'multimedia', 'arsip'));
+  check (module in ('evp', 'surat', 'keluar', 'pos', 'multimedia', 'arsip', 'drone'));
 
 -- 2. Peran: disimpan di app_metadata akun (tidak bisa diubah pengguna sendiri).
 --    Tanpa peran berarti staf. Hanya admin yang boleh menghapus data dan mengatur peran.

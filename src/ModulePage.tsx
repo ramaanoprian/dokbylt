@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Columns3, List, Paperclip, Plus, Search } from 'lucide-react';
 import type { ModuleDef } from './modules';
-import { attachmentsOf, type DocRecord } from './backend';
+import { attachmentsOf, sendDroneNotify, type DocRecord, type NotifyKind } from './backend';
 import { cancelNotify, queueNotify } from './notifyQueue';
 import { DataMenu } from './DataMenu';
+import { DroneQrButton } from './DroneQr';
 import { Hero, LocalNav } from './LocalNav';
 import type { FileApi } from './Attachments';
 import { Icon } from './icons';
@@ -33,7 +34,7 @@ interface Props {
   loading: boolean;
   openId?: string;
   onOpened: () => void;
-  onSave: (r: DocRecord, prev?: DocRecord) => void | Promise<boolean>;
+  onSave: (r: DocRecord, prev?: DocRecord) => void | Promise<NotifyKind>;
   onDelete: (r: DocRecord) => void;
   onRestore: (r: DocRecord) => void;
   onImport: (recs: DocRecord[]) => Promise<string | null>;
@@ -46,7 +47,7 @@ type Editing = { record?: DocRecord; targetStatus?: string } | null;
 type View = 'tabel' | 'papan';
 
 /** Kolom yang paling menggambarkan data; dipakai sebagai judul kartu di HP. */
-const TITLE_KEYS = ['perihal', 'kegiatan', 'uraian', 'tujuan', 'asal', 'pengirim'];
+const TITLE_KEYS = ['perihal', 'kegiatan', 'uraian', 'keperluan', 'tujuan', 'asal', 'pengirim'];
 
 export function ModulePage({
   mod,
@@ -124,8 +125,14 @@ export function ModulePage({
 
   // WA ke PIC tidak langsung dikirim: masuk antrean agar beberapa dokumen digabung jadi satu pesan.
   const saveAndNotify = (r: DocRecord, prev?: DocRecord) =>
-    Promise.resolve(onSave(r, prev)).then((notify) => {
-      if (notify) queueNotify(r);
+    Promise.resolve(onSave(r, prev)).then(async (notify) => {
+      if (notify === 'batch') queueNotify(r);
+      else if (notify === 'instant') {
+        const who = r.values.pic || 'peminjam';
+        const res = await sendDroneNotify(r.id);
+        if (res.sent) toast(`WA terkirim ke ${who}`);
+        else toast(`WA ke ${who} belum terkirim (${res.reason})`);
+      }
       else if (mod.notifyStatus && mod.statuses.indexOf(r.status) < mod.statuses.indexOf(mod.notifyStatus))
         cancelNotify(r.id);
     });
@@ -197,6 +204,7 @@ export function ModulePage({
   return (
     <>
       <LocalNav title={mod.menu} icon={mod.icon} mod={mod.id}>
+        {mod.id === 'drone' && <DroneQrButton />}
         <DataMenu
           mod={mod}
           rows={view === 'papan' ? searched : filtered}

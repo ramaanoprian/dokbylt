@@ -128,7 +128,7 @@ export function DataMenu({ mod, rows, userName, onImport }: Props) {
                     <ul className="import-preview">
                       {result.records.slice(0, 5).map((r) => (
                         <li key={r.id}>
-                          <b>{r.values.perihal || r.values.kegiatan || r.values.uraian || r.values.tujuan || '–'}</b>
+                          <b>{r.values.perihal || r.values.kegiatan || r.values.uraian || r.values.keperluan || r.values.tujuan || '–'}</b>
                           <span className="muted small">{r.status}</span>
                         </li>
                       ))}
