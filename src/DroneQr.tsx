@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { Copy, Printer, QrCode, X } from 'lucide-react';
 import { useToast } from './toast';
@@ -13,7 +14,8 @@ export function DroneQrButton() {
       <button className="lnav-link" onClick={() => setOpen(true)}>
         <QrCode size={15} /> <span className="hide-sm">QR formulir</span>
       </button>
-      {open && <DroneQrDialog onClose={() => setOpen(false)} />}
+      {/* Di luar bilah menu: bilah itu memakai blur, yang membuat jendela ikut terpotong. */}
+      {open && createPortal(<DroneQrDialog onClose={() => setOpen(false)} />, document.body)}
     </>
   );
 }
