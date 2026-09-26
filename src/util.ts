@@ -85,13 +85,28 @@ export function daysUntil(date: string) {
 /** Tenggat yang masih berlaku untuk record; kosong bila sudah selesai atau tidak ada tenggat. */
 export function deadlineOf(mod: ModuleDef, r: DocRecord): string | undefined {
   if (isDone(mod, r)) return undefined;
-  if (r.values.tenggat) return r.values.tenggat;
   // Kegiatan multimedia yang belum diliput: tanggal kegiatannya adalah tenggat.
-  if (mod.id === 'multimedia' && r.status === mod.statuses[0]) return r.values.tanggal || undefined;
-  return undefined;
+  if (mod.id === 'multimedia' && r.status === mod.statuses[0] && r.values.tanggal) return r.values.tanggal;
+  return r.values.tenggat || undefined;
 }
 
 export const REMIND_DAYS = 3;
+
+/** Tanggal (YYYY-MM-DD) sekian hari kerja setelah `date`, melewati Sabtu dan Minggu. */
+export function addWorkdays(date: string, n: number) {
+  const d = new Date(date + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  let left = n;
+  while (left > 0) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) left--;
+  }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Tenggat bawaan menu untuk data dengan nilai-nilai ini, atau kosong bila menu tidak punya. */
+export const defaultDue = (mod: ModuleDef, values: Record<string, string>) =>
+  mod.dueDays && values[mod.dateField] ? addWorkdays(values[mod.dateField], mod.dueDays) : '';
 
 export function dueLabel(days: number) {
   if (days < 0) return `Lewat ${-days} hari`;

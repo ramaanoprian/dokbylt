@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { MessageCircle, Printer, X } from 'lucide-react';
+import { Check, MessageCircle, Printer, X } from 'lucide-react';
 import { OTHER, otherKey, type ModuleDef } from './modules';
 import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
-import { daysUntil, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
+import { daysUntil, defaultDue, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
+import { Icon } from './icons';
+import { stageClass } from './stats';
 import { Attachments, type FileApi } from './Attachments';
 import { printDisposition, printReceipt } from './print';
 
@@ -25,8 +27,12 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
     if (record) return { ...record.values };
     const init: Record<string, string> = {};
     for (const f of mod.fields) if (f.type === 'date' && f.key !== 'tenggat') init[f.key] = today();
+    const due = defaultDue(mod, init);
+    if (due) init.tenggat = due;
     return init;
   });
+  // Tenggat mengikuti tanggal utama sampai diubah sendiri oleh pengguna.
+  const [dueAuto, setDueAuto] = useState(() => !record || (!record.values.tenggat && !!mod.dueDays));
   const [status, setStatus] = useState(targetStatus ?? record?.status ?? mod.statuses[0]);
 
   const needed = new Set([
@@ -38,7 +44,15 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
   const missing = mod.fields.filter((f) => needed.has(f.key) && !values[f.key]?.trim());
   const otherMissing = mod.fields.filter((f) => values[f.key] === OTHER && !values[otherKey(f.key)]?.trim());
   const blocked = missing.length + otherMissing.length > 0;
-  const set = (k: string, v: string) => setValues({ ...values, [k]: v });
+  const set = (k: string, v: string) => {
+    const next = { ...values, [k]: v };
+    if (k === 'tenggat') setDueAuto(false);
+    else if (k === mod.dateField && dueAuto && mod.fields.some((f) => f.key === 'tenggat')) {
+      const due = defaultDue(mod, next);
+      if (due) next.tenggat = due;
+    }
+    setValues(next);
+  };
 
   useEffect(() => {
     const on = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -86,9 +100,19 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <form className="sheet" onSubmit={submit} role="dialog" aria-modal="true" aria-label={`${record ? 'Ubah' : 'Tambah'} ${mod.itemName}`}>
+      <form
+        className="sheet record-form"
+        data-mod={mod.id}
+        onSubmit={submit}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${record ? 'Ubah' : 'Tambah'} ${mod.itemName}`}
+      >
         <header className="sheet-head">
-          <div>
+          <span className="app-icon">
+            <Icon name={mod.icon} size={18} />
+          </span>
+          <div className="grow">
             <p className="eyebrow">{mod.title}</p>
             <h2>
               {record ? 'Ubah' : 'Tambah'} {mod.itemName}
@@ -100,6 +124,19 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
         </header>
 
         <div className="sheet-body">
+          <fieldset className="stepper">
+            <legend>Tahap</legend>
+            {mod.statuses.map((s, i) => {
+              const cur = mod.statuses.indexOf(status);
+              return (
+                <label key={s} className={(status === s ? 'on ' : cur > i ? 'past ' : '') + stageClass(mod, s)}>
+                  <input type="radio" name="status" value={s} checked={status === s} onChange={() => setStatus(s)} />
+                  <span className="dot">{cur > i ? <Check size={13} strokeWidth={3} /> : i + 1}</span>
+                  <span className="step-label">{s}</span>
+                </label>
+              );
+            })}
+          </fieldset>
           {otherMissing.length > 0 && (
             <p className="notice">
               Anda memilih “Lainnya” pada {otherMissing.map((f) => f.label.toLowerCase()).join(', ')}. Sebutkan
@@ -155,7 +192,14 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
                 {f.key === 'tenggat' && values.tenggat && mod.statuses.indexOf(status) < mod.statuses.length - 1 && (
                   <span className={'due ' + dueTone(daysUntil(values.tenggat))}>{dueLabel(daysUntil(values.tenggat))}</span>
                 )}
-                {f.hint && <small className="hint">{f.hint}</small>}
+                {f.key === 'tenggat' && dueAuto && values.tenggat && mod.dueDays ? (
+                  <small className="hint">
+                    Otomatis {mod.dueDays} hari kerja setelah {mod.fields.find((x) => x.key === mod.dateField)?.label.toLowerCase()}
+                    , bisa diubah.
+                  </small>
+                ) : (
+                  f.hint && <small className="hint">{f.hint}</small>
+                )}
               </label>
             ))}
           </div>
@@ -184,16 +228,6 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
             onChange={(list) => set('lampiran', JSON.stringify(list))}
           />
 
-          <fieldset className="stepper">
-            <legend>Tahap</legend>
-            {mod.statuses.map((s, i) => (
-              <label key={s} className={status === s ? 'on' : mod.statuses.indexOf(status) > i ? 'past' : ''}>
-                <input type="radio" name="status" value={s} checked={status === s} onChange={() => setStatus(s)} />
-                <span className="dot">{i + 1}</span>
-                <span>{s}</span>
-              </label>
-            ))}
-          </fieldset>
 
           {record && record.history.length > 0 && (
             <div className="timeline">
@@ -249,7 +283,7 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
           <button type="button" className="btn" onClick={onClose}>
             Batal
           </button>
-          <button type="submit" className="btn primary" disabled={blocked}>
+          <button type="submit" className="pill-btn big" disabled={blocked}>
             Simpan
           </button>
         </footer>
