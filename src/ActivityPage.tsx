@@ -34,10 +34,10 @@ function describeDetail(a: Activity) {
   return a.detail;
 }
 
-export function ActivityLine({ a, showDate }: { a: Activity; showDate?: boolean }) {
+export function ActivityLine({ a, showDate, onOpen }: { a: Activity; showDate?: boolean; onOpen?: () => void }) {
   const mod = moduleById(a.module);
   return (
-    <li className="activity">
+    <li className={'activity' + (onOpen && a.action !== 'hapus' ? ' clickable' : '')} onClick={a.action !== 'hapus' ? onOpen : undefined}>
       <span className="avatar" title={a.userName}>
         {initials(a.userName)}
       </span>
@@ -60,7 +60,7 @@ export function ActivityLine({ a, showDate }: { a: Activity; showDate?: boolean 
   );
 }
 
-export function ActivityPage({ activity }: { activity: Activity[] }) {
+export function ActivityPage({ activity, go }: { activity: Activity[]; go: (m: Activity['module'], id?: string) => void }) {
   const [who, setWho] = useState('');
   const [mod, setMod] = useState('');
   const [q, setQ] = useState('');
@@ -131,7 +131,7 @@ export function ActivityPage({ activity }: { activity: Activity[] }) {
               <h3 className="day-head">{day}</h3>
               <ul className="rows">
                 {items.map((a) => (
-                  <ActivityLine key={a.id} a={a} />
+                  <ActivityLine key={a.id} a={a} onOpen={a.recordId ? () => go(a.module, a.recordId) : undefined} />
                 ))}
               </ul>
             </div>

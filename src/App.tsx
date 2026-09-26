@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { CloudOff, Download, KeyRound, LogOut, Menu, Upload, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { CloudOff, Download, KeyRound, LogOut, Menu, Moon, Search, Sun, Upload, X } from 'lucide-react';
 import { MODULES, moduleById, type ModuleId } from './modules';
 import { isOnline, useBackend, type DataStore } from './backend';
 import { Icon } from './icons';
@@ -7,7 +7,8 @@ import { ModulePage } from './ModulePage';
 import { Overview } from './Overview';
 import { ActivityPage, initials } from './ActivityPage';
 import { LoginPage, NamePrompt } from './LoginPage';
-import { exportJson, isDone } from './util';
+import { CommandPalette } from './CommandPalette';
+import { exportJson, isDone, readPref, writePref } from './util';
 
 type Page = 'ringkasan' | 'aktivitas' | ModuleId;
 
@@ -20,6 +21,12 @@ export default function App() {
   const be = useBackend();
   const [page, setPage] = useState<Page>(readHash);
   const [navOpen, setNavOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [openId, setOpenId] = useState<string | undefined>();
+  const [dark, setDark] = useState(() => {
+    const p = readPref('theme', '');
+    return p ? p === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -28,19 +35,47 @@ export default function App() {
     return () => removeEventListener('hashchange', on);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0f1524' : '#ffffff');
+  }, [dark]);
+
+  const toggleTheme = useCallback(() => {
+    setDark((d) => {
+      writePref('theme', d ? 'light' : 'dark');
+      return !d;
+    });
+  }, []);
+
+  // Ctrl/Cmd+K atau "/" membuka pencarian cepat.
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      const typing = /INPUT|TEXTAREA|SELECT/.test(t.tagName);
+      if ((e.key === 'k' && (e.ctrlKey || e.metaKey)) || (e.key === '/' && !typing)) {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+      }
+    };
+    addEventListener('keydown', on);
+    return () => removeEventListener('keydown', on);
+  }, []);
+
+  const go = useCallback((p: Page, id?: string) => {
+    location.hash = p === 'ringkasan' ? '' : p;
+    setPage(p);
+    setOpenId(id);
+    setNavOpen(false);
+    scrollTo(0, 0);
+  }, []);
+  const clearOpen = useCallback(() => setOpenId(undefined), []);
+
   if (!be.authReady) return <div className="splash" />;
   if (!be.user) return <LoginPage onSignIn={be.signIn} />;
   if (isOnline && !be.user.name) return <NamePrompt email={be.user.email} onSave={be.setName} />;
 
   const userName = be.user.name;
   const { data } = be;
-
-  const go = (p: Page) => {
-    location.hash = p === 'ringkasan' ? '' : p;
-    setPage(p);
-    setNavOpen(false);
-    scrollTo(0, 0);
-  };
 
   const importBackup = async (file: File) => {
     try {
@@ -81,6 +116,12 @@ export default function App() {
           </button>
         </div>
 
+        <button className="search-trigger" onClick={() => setPaletteOpen(true)}>
+          <Search size={16} />
+          <span className="grow">Cari apa saja…</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+
         <nav>
           {navItem('ringkasan', 'ringkasan', 'Ringkasan')}
           <p className="nav-label">Alur kerja</p>
@@ -92,6 +133,11 @@ export default function App() {
         </nav>
 
         <div className="sidebar-foot">
+          {isOnline && (
+            <div className="live" title="Perubahan dari perangkat lain muncul otomatis">
+              <span className="live-dot" /> Tersinkron langsung
+            </div>
+          )}
           {!isOnline && (
             <div className="offline-note">
               <CloudOff size={16} />
@@ -106,6 +152,9 @@ export default function App() {
             </span>
           </div>
           <div className="account-actions">
+            <button className="btn ghost small" onClick={toggleTheme} title="Ganti tema">
+              {dark ? <Sun size={15} /> : <Moon size={15} />} {dark ? 'Terang' : 'Gelap'}
+            </button>
             <button className="btn ghost small" onClick={() => exportJson(data)} title="Unduh semua data (JSON)">
               <Download size={15} /> Unduh data
             </button>
@@ -145,7 +194,12 @@ export default function App() {
             <Menu size={22} />
           </button>
           <strong>Dokumen BYLT</strong>
-          <span className="avatar sm">{initials(userName)}</span>
+          <button className="icon-btn push" onClick={() => setPaletteOpen(true)} aria-label="Cari">
+            <Search size={20} />
+          </button>
+          <button className="icon-btn" onClick={toggleTheme} aria-label="Ganti tema">
+            {dark ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
         </div>
         {be.error && (
           <div className="toast" role="alert">
@@ -158,22 +212,51 @@ export default function App() {
         <main>
           {be.loading && <div className="loading-bar" />}
           {page === 'ringkasan' ? (
-            <Overview data={data} activity={be.activity} userName={userName} go={go} />
+            <Overview data={data} activity={be.activity} userName={userName} loading={be.loading} go={go} />
           ) : page === 'aktivitas' ? (
-            <ActivityPage activity={be.activity} />
+            <ActivityPage activity={be.activity} go={go} />
           ) : (
             <ModulePage
               key={page}
               mod={moduleById(page)}
               rows={data[page]}
               userName={userName}
+              loading={be.loading}
+              openId={openId}
+              onOpened={clearOpen}
               onSave={(r, prev) => be.save(page, r, prev)}
               onDelete={(r) => be.remove(page, r)}
+              onRestore={(r) => be.save(page, r)}
             />
           )}
         </main>
       </div>
+      <nav className="bottom-nav" aria-label="Navigasi">
+        {(['ringkasan', 'evp', 'surat', 'pos'] as const).map((p) => {
+          const icon = p === 'ringkasan' ? 'ringkasan' : moduleById(p).icon;
+          const text = p === 'ringkasan' ? 'Ringkasan' : p === 'surat' ? 'Surat' : moduleById(p).menu;
+          return (
+            <button key={p} className={page === p ? 'active' : ''} onClick={() => go(p)}>
+              <Icon name={icon} size={20} />
+              <span>{text}</span>
+            </button>
+          );
+        })}
+        <button onClick={() => setNavOpen(true)}>
+          <Menu size={20} />
+          <span>Lainnya</span>
+        </button>
+      </nav>
       {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
+      {paletteOpen && (
+        <CommandPalette
+          data={data}
+          dark={dark}
+          onClose={() => setPaletteOpen(false)}
+          go={go}
+          toggleTheme={toggleTheme}
+        />
+      )}
     </div>
   );
 }

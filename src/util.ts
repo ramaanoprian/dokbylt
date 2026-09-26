@@ -47,3 +47,20 @@ export function exportJson(data: unknown) {
 export function fmtTime(v: string) {
   return new Date(v).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 }
+
+/** Preferensi tampilan per browser (tidak penting bila hilang). */
+export function readPref(key: string, fallback: string) {
+  try {
+    return localStorage.getItem('dokbylt:pref:' + key) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function writePref(key: string, value: string) {
+  try {
+    localStorage.setItem('dokbylt:pref:' + key, value);
+  } catch {
+    /* abaikan */
+  }
+}
