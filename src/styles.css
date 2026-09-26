@@ -26,6 +26,7 @@
   --warn-soft: rgba(255, 149, 0, 0.14);
   --c-evp: #007aff;
   --c-surat: #af52de;
+  --c-keluar: #5856d6;
   --c-pos: #ff9500;
   --c-multimedia: #ff2d55;
   --c-arsip: #34c759;
@@ -64,6 +65,7 @@
   --warn-soft: rgba(255, 159, 10, 0.18);
   --c-evp: #0a84ff;
   --c-surat: #bf5af2;
+  --c-keluar: #5e5ce6;
   --c-pos: #ff9f0a;
   --c-multimedia: #ff375f;
   --c-arsip: #30d158;
@@ -174,6 +176,7 @@ main { padding: 40px 48px 64px; max-width: 1280px; position: relative; }
 .page-title .chip-icon { width: 52px; height: 52px; border-radius: 14px; }
 .c-evp { background: linear-gradient(180deg, color-mix(in srgb, var(--c-evp) 80%, #fff), var(--c-evp)); }
 .c-surat { background: linear-gradient(180deg, color-mix(in srgb, var(--c-surat) 80%, #fff), var(--c-surat)); }
+.c-keluar { background: linear-gradient(180deg, color-mix(in srgb, var(--c-keluar) 80%, #fff), var(--c-keluar)); }
 .c-pos { background: linear-gradient(180deg, color-mix(in srgb, var(--c-pos) 80%, #fff), var(--c-pos)); }
 .c-multimedia { background: linear-gradient(180deg, color-mix(in srgb, var(--c-multimedia) 80%, #fff), var(--c-multimedia)); }
 .c-arsip { background: linear-gradient(180deg, color-mix(in srgb, var(--c-arsip) 80%, #fff), var(--c-arsip)); }
@@ -306,7 +309,7 @@ td .due { display: flex; width: fit-content; margin-left: 0; }
 .remind-list li > * { min-width: 0; }
 .remind-list .due, .bell-pop li .due { margin: 0; flex: none; white-space: nowrap; }
 
-.stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 20px; }
+.stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; margin-bottom: 20px; }
 .stat {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
   background: var(--surface); border: 0; border-radius: var(--radius); box-shadow: var(--shadow);
@@ -543,6 +546,55 @@ td.actions .btn:hover { background: var(--primary); color: #fff; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
+
+/* ---------- Menu data, impor, lampiran, resi, peran ---------- */
+.menu-wrap { position: relative; }
+.menu-pop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; min-width: 230px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow-lg);
+  animation: pop 0.25s var(--spring); transform-origin: top right;
+}
+.menu-pop button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; background: none; border-radius: 9px; font-size: 0.88rem; color: var(--text); cursor: pointer; text-align: left; }
+.menu-pop button:hover { background: var(--border); }
+.menu-pop svg { color: var(--muted); flex: none; }
+.menu-pop hr { border: 0; border-top: 1px solid var(--border); margin: 4px 6px; }
+.sheet.narrow { width: min(560px, 100%); }
+.import-count { font-size: 1.05rem; margin: 0 0 14px; }
+.import-preview { list-style: none; margin: 0 0 14px; padding: 0; border-radius: 12px; background: var(--surface-2); }
+.import-preview li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+.import-preview li:last-child { border-bottom: 0; }
+.import-preview b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-details { margin-bottom: 12px; font-size: 0.86rem; }
+.import-details summary { cursor: pointer; color: var(--primary); }
+.import-details ul { margin: 8px 0 0; padding-left: 18px; color: var(--text-2); }
+
+.attachments { margin-top: 22px; }
+.att-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.84rem; font-weight: 500; color: var(--text-2); margin-bottom: 8px; }
+.att-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 6px; }
+.att-list li { display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 6px; border-radius: 12px; background: var(--surface-2); font-size: 0.86rem; min-width: 0; }
+.att-thumb { width: 48px; height: 48px; border-radius: 9px; overflow: hidden; flex: none; display: grid; place-items: center; background: var(--surface-3); color: var(--muted); }
+.att-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.att-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mcard-clip { color: var(--muted); margin-right: 5px; vertical-align: -1px; }
+
+.resi-box { display: flex; align-items: center; gap: 14px; margin-top: 22px; padding: 14px 16px; border-radius: 14px; background: color-mix(in srgb, #25d366 10%, var(--surface)); font-size: 0.9rem; }
+.resi-box b { font-weight: 600; }
+.btn.wa { background: #25d366; color: #fff; flex: none; }
+.btn.wa:hover:not(:disabled) { background: #1ebe5b; }
+.btn.wa:disabled { background: var(--surface-3); color: var(--muted); }
+
+.role-badge { display: inline-block; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px 6px; border-radius: 5px; background: var(--surface-3); color: var(--text-2); vertical-align: 1px; }
+.role-badge.admin { background: var(--primary-soft); color: var(--primary); }
+.staff-list { list-style: none; margin: 14px 0 0; padding: 0; }
+.staff-list li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; min-width: 0; }
+.staff-list li:last-child { border-bottom: 0; }
+.staff-list .grow { min-width: 0; }
+.staff-list .small { overflow-wrap: anywhere; }
+
+.rekap { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.rekap input { font: inherit; font-size: 0.85rem; padding: 4px 10px; border-radius: 9px; border: 1px solid var(--border-strong, var(--border)); background: var(--surface); color: var(--text); }
+.rekap .link:disabled { opacity: 0.4; cursor: default; }
+
 /* ---------- Layar kecil ---------- */
 @media (max-width: 1180px) {
   .stats { grid-template-columns: repeat(3, 1fr); }
@@ -613,6 +665,8 @@ td.actions .btn:hover { background: var(--primary); color: #fff; }
   .flow-label { font-size: 0.82rem; white-space: nowrap; }
   .flow-fill, .flow-arrow { display: none; }
   .form-grid { grid-template-columns: 1fr; }
+  .resi-box { flex-direction: column; align-items: stretch; }
+  .staff-list li { flex-wrap: wrap; }
   /* Di HP, pop-up muncul dari bawah seperti lembar iOS. */
   .overlay { align-items: flex-end; padding: 0; }
   .sheet { width: 100%; max-height: 92vh; border-radius: 22px 22px 0 0; animation: sheet-up 0.45s var(--spring); }

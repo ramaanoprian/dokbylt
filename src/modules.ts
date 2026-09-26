@@ -30,7 +30,7 @@ export interface ModuleDef {
   dateField: string;
 }
 
-export type ModuleId = 'evp' | 'surat' | 'pos' | 'multimedia' | 'arsip';
+export type ModuleId = 'evp' | 'surat' | 'keluar' | 'pos' | 'multimedia' | 'arsip';
 
 export const UNITS = ['Rencana', 'Logistik', 'Keuangan', 'SDM', 'Dokumen', 'Lainnya'];
 
@@ -99,6 +99,34 @@ export const MODULES: ModuleDef[] = [
     ],
     statuses: ['Didata', 'Didistribusikan'],
     requiredForStatus: { Didistribusikan: ['penerima'] },
+  },
+  {
+    id: 'keluar',
+    title: 'Surat Keluar',
+    menu: 'Surat Keluar',
+    description: 'Surat dari Balai Yasa Lahat untuk pihak luar: didata, ditandatangani, lalu dikirim ke tujuan.',
+    icon: 'keluar',
+    itemName: 'surat',
+    dateField: 'tanggal',
+    fields: [
+      { key: 'tanggal', label: 'Tanggal surat', type: 'date', required: true, inTable: true },
+      tenggat('Batas surat harus sudah dikirim'),
+      { key: 'nomorSurat', label: 'Nomor surat', type: 'text', inTable: true },
+      { key: 'unit', label: 'Unit pembuat', type: 'select', options: UNITS, required: true, inTable: true },
+      { key: 'tujuan', label: 'Tujuan', type: 'text', required: true, inTable: true },
+      { key: 'perihal', label: 'Perihal', type: 'text', required: true, inTable: true },
+      { key: 'sifat', label: 'Sifat', type: 'select', options: ['Biasa', 'Segera', 'Rahasia'] },
+      {
+        key: 'pengiriman',
+        label: 'Cara pengiriman',
+        type: 'select',
+        options: ['Diantar langsung', 'Kantor Pos', 'Email', 'Lainnya'],
+      },
+      { key: 'penerima', label: 'Diterima oleh (di tujuan)', type: 'text' },
+      { key: 'catatan', label: 'Catatan', type: 'textarea' },
+    ],
+    statuses: ['Didata', 'Ditandatangani', 'Dikirim'],
+    requiredForStatus: { Dikirim: ['pengiriman'] },
   },
   {
     id: 'pos',

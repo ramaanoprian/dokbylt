@@ -6,6 +6,7 @@ import {
   Mail,
   Package,
   PenLine,
+  Send,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -13,6 +14,7 @@ export const ICONS = {
   ringkasan: LayoutDashboard,
   evp: PenLine,
   surat: Mail,
+  keluar: Send,
   pos: Package,
   multimedia: Camera,
   arsip: Archive,

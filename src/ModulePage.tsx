@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Columns3, Download, List, Plus, Search } from 'lucide-react';
+import { ChevronRight, Columns3, List, Paperclip, Plus, Search } from 'lucide-react';
 import type { ModuleDef } from './modules';
-import type { DocRecord } from './backend';
+import { attachmentsOf, type DocRecord } from './backend';
+import { DataMenu } from './DataMenu';
+import type { FileApi } from './Attachments';
 import { Icon } from './icons';
 import { RecordForm } from './RecordForm';
 import { Board } from './Board';
 import { useToast } from './toast';
-import { daysSince, daysUntil, deadlineOf, dueLabel, dueTone, exportCsv, fmtDate, isDone, lastMove, readPref, shown, writePref, REMIND_DAYS } from './util';
+import { daysSince, daysUntil, deadlineOf, dueLabel, dueTone, fmtDate, isDone, lastMove, readPref, shown, writePref, REMIND_DAYS } from './util';
 
 interface Props {
   mod: ModuleDef;
@@ -18,6 +20,10 @@ interface Props {
   onSave: (r: DocRecord, prev?: DocRecord) => void;
   onDelete: (r: DocRecord) => void;
   onRestore: (r: DocRecord) => void;
+  onImport: (recs: DocRecord[]) => Promise<string | null>;
+  /** Hanya admin yang boleh menghapus data. */
+  canDelete: boolean;
+  files: FileApi;
 }
 
 type Editing = { record?: DocRecord; targetStatus?: string } | null;
@@ -26,7 +32,7 @@ type View = 'tabel' | 'papan';
 /** Kolom yang paling menggambarkan data; dipakai sebagai judul kartu di HP. */
 const TITLE_KEYS = ['perihal', 'kegiatan', 'uraian', 'tujuan', 'asal', 'pengirim'];
 
-export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onSave, onDelete, onRestore }: Props) {
+export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onSave, onDelete, onRestore, onImport, canDelete, files }: Props) {
   const toast = useToast();
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('aktif');
@@ -179,9 +185,16 @@ export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onS
             <Columns3 size={16} /> <span className="hide-sm">Papan</span>
           </button>
         </div>
-        <button className="btn ghost" onClick={() => exportCsv(mod, filtered)} disabled={!filtered.length} title="Unduh CSV">
-          <Download size={16} /> <span className="hide-sm">CSV</span>
-        </button>
+        <DataMenu
+          mod={mod}
+          rows={view === 'papan' ? searched : filtered}
+          userName={userName}
+          onImport={async (recs) => {
+            const e = await onImport(recs);
+            if (!e) toast(`${recs.length} ${mod.itemName} berhasil diimpor`);
+            return e;
+          }}
+        />
       </div>
 
       {showSkeleton ? (
@@ -276,7 +289,8 @@ export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onS
               return (
                 <li key={r.id} className="mcard row-in" onClick={() => setEditing({ record: r })}>
                   <div className="mcard-main">
-                    <b className="mcard-title">{(titleKey && r.values[titleKey]) || mod.itemName}</b>
+                    <b className="mcard-title">
+                      {attachmentsOf(r.values).length > 0 && <Paperclip size={13} className="mcard-clip" aria-label="Ada lampiran" />}{(titleKey && r.values[titleKey]) || mod.itemName}</b>
                     {meta.length > 0 && <span className="mcard-meta">{meta.join(' · ')}</span>}
                     <span className="mcard-tags">
                       <span className={'pill ' + (done ? 'done' : idx === 0 ? 'new' : 'mid')}>{r.status}</span>
@@ -325,8 +339,9 @@ export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onS
             setEditing(null);
             toast(editing.record ? 'Perubahan disimpan' : `${mod.itemName[0].toUpperCase()}${mod.itemName.slice(1)} baru dicatat`);
           }}
+          files={files}
           onDelete={
-            editing.record
+            editing.record && canDelete
               ? () => {
                   const r = editing.record!;
                   onDelete(r);

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { MessageCircle, Printer, X } from 'lucide-react';
 import { OTHER, otherKey, type ModuleDef } from './modules';
-import { newId, type DocRecord, type HistoryEntry } from './backend';
-import { daysUntil, dueLabel, dueTone, fmtDateTime, today } from './util';
+import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
+import { daysUntil, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
+import { Attachments, type FileApi } from './Attachments';
+import { printDisposition, printReceipt } from './print';
 
 interface Props {
   mod: ModuleDef;
@@ -13,9 +15,12 @@ interface Props {
   onSave: (r: DocRecord) => void;
   onDelete?: () => void;
   onClose: () => void;
+  files: FileApi;
 }
 
-export function RecordForm({ mod, record, userName, targetStatus, onSave, onDelete, onClose }: Props) {
+export function RecordForm({ mod, record, userName, targetStatus, onSave, onDelete, onClose, files }: Props) {
+  // Id dibuat di awal agar lampiran bisa diunggah sebelum data disimpan.
+  const [id] = useState(() => record?.id ?? newId());
   const [values, setValues] = useState<Record<string, string>>(() => {
     if (record) return { ...record.values };
     const init: Record<string, string> = {};
@@ -47,11 +52,15 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
     // Buang keterangan "Lainnya" yang tidak lagi dipakai.
     const clean = { ...values };
     for (const f of mod.fields) if (clean[f.key] !== OTHER) delete clean[otherKey(f.key)];
+    if (!clean.lampiran || clean.lampiran === '[]') delete clean.lampiran;
+    // Hapus dari penyimpanan berkas yang dibuang dari daftar lampiran.
+    const kept = new Set(attachmentsOf(clean).map((a) => a.path));
+    for (const a of attachmentsOf(record?.values ?? {})) if (!kept.has(a.path)) files.remove(a.path);
     const now = new Date().toISOString();
     const history: HistoryEntry[] = record ? [...record.history] : [];
     if (!record || record.status !== status) history.push({ status, at: now, by: userName });
     onSave({
-      id: record?.id ?? newId(),
+      id,
       createdAt: record?.createdAt ?? now,
       updatedAt: now,
       createdBy: record?.createdBy ?? userName,
@@ -61,6 +70,19 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
       values: clean,
     });
   };
+
+  const wa = waNumber(values.kontak);
+  const mail = emailOf(values.kontak);
+  const canSendResi = mod.id === 'pos' && !!values.resi?.trim() && !!(wa || mail);
+  const sendResi = () => {
+    const text = resiMessage(values);
+    if (wa) window.open(`https://wa.me/${wa}?text=${encodeURIComponent(text)}`, '_blank');
+    else location.href = `mailto:${mail}?subject=${encodeURIComponent('Nomor resi kiriman')}&body=${encodeURIComponent(text)}`;
+    // Resi sudah dikirim ke user: majukan tahap bila belum.
+    const last = mod.statuses[mod.statuses.length - 1];
+    if (mod.statuses.indexOf(status) < mod.statuses.indexOf(last)) setStatus(last);
+  };
+  const current = (): DocRecord => ({ ...(record as DocRecord), id, status, values });
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -138,6 +160,30 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
             ))}
           </div>
 
+          {mod.id === 'pos' && (
+            <div className="resi-box">
+              <div className="grow">
+                <b>Kirim resi ke pengirim</b>
+                <span className="muted small block">
+                  {canSendResi
+                    ? `Lewat ${wa ? 'WhatsApp' : 'email'} ke ${values.pengirim || (wa ? '+' + wa : mail)}. Tahap otomatis jadi “${mod.statuses[mod.statuses.length - 1]}”; simpan setelahnya.`
+                    : 'Isi nomor resi dan kontak pengirim (nomor WA atau email) untuk mengirim resi.'}
+                </span>
+              </div>
+              <button type="button" className="btn wa" onClick={sendResi} disabled={!canSendResi}>
+                <MessageCircle size={16} /> {mail && !wa ? 'Kirim email' : 'Kirim via WA'}
+              </button>
+            </div>
+          )}
+
+          <Attachments
+            folder={`${mod.id}/${id}`}
+            items={attachmentsOf(values)}
+            userName={userName}
+            files={files}
+            onChange={(list) => set('lampiran', JSON.stringify(list))}
+          />
+
           <fieldset className="stepper">
             <legend>Tahap</legend>
             {mod.statuses.map((s, i) => (
@@ -182,6 +228,21 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
               onClick={onDelete}
             >
               Hapus
+            </button>
+          )}
+          {record && (
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => (mod.id === 'surat' ? printDisposition(mod, current()) : printReceipt(mod, current()))}
+              title={mod.id === 'surat' ? 'Cetak lembar disposisi' : 'Cetak tanda terima'}
+            >
+              <Printer size={16} /> <span className="hide-sm">{mod.id === 'surat' ? 'Disposisi' : 'Tanda terima'}</span>
+            </button>
+          )}
+          {record && mod.id === 'surat' && (
+            <button type="button" className="btn ghost" onClick={() => printReceipt(mod, current())} title="Cetak tanda terima">
+              <Printer size={16} /> <span className="hide-sm">Tanda terima</span>
             </button>
           )}
           <span className="spacer" />
