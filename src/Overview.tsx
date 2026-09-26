@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
-import { ChevronRight, Plus } from 'lucide-react';
+import { BellRing, ChevronRight, Plus } from 'lucide-react';
 import { MODULES, UNITS, moduleById, type ModuleId } from './modules';
 import type { Activity, DataStore } from './backend';
 import { Icon } from './icons';
 import { ActivityLine } from './ActivityPage';
 import { ActivityBars, CountUp, HBars, type DayBar } from './charts';
-import { daysSince, isDone, lastMove } from './util';
+import { daysSince, dueLabel, dueTone, fmtDate, isDone, lastMove } from './util';
+import { collectReminders } from './reminders';
 
 interface Props {
   data: DataStore;
@@ -32,6 +33,8 @@ export function Overview({ data, activity, userName, loading, go }: Props) {
       .filter((r) => !isDone(m, r) && daysSince(lastMove(r)) >= 3)
       .map((r) => ({ m, r, age: daysSince(lastMove(r)) })),
   ).sort((a, b) => b.age - a.age);
+
+  const reminders = useMemo(() => collectReminders(data), [data]);
 
   const days: DayBar[] = useMemo(() => {
     const counts = new Map<string, number>();
@@ -75,9 +78,11 @@ export function Overview({ data, activity, userName, loading, go }: Props) {
             {userName ? `, ${userName.split(' ')[0]}` : ''}
           </h1>
           <p className="muted">
-            {stale.length > 0
-              ? `Ada ${stale.length} pekerjaan yang tertahan 3 hari atau lebih.`
-              : 'Semua pekerjaan berjalan lancar hari ini.'}
+            {reminders.length > 0
+              ? `${reminders.length} data mendekati atau melewati tenggat.`
+              : stale.length > 0
+                ? `Ada ${stale.length} pekerjaan yang tertahan 3 hari atau lebih.`
+                : 'Semua pekerjaan berjalan lancar hari ini.'}
           </p>
         </div>
         <div className="quick">
@@ -92,6 +97,39 @@ export function Overview({ data, activity, userName, loading, go }: Props) {
           ))}
         </div>
       </header>
+
+      {reminders.length > 0 && (
+        <div className="card pad remind">
+          <div className="card-head">
+            <div className="remind-title">
+              <span className="remind-icon">
+                <BellRing size={18} />
+              </span>
+              <div>
+                <h2>Pengingat tenggat</h2>
+                <p className="muted small">Lewat tenggat atau jatuh tempo dalam 3 hari</p>
+              </div>
+            </div>
+            <span className="pill warn">{reminders.length}</span>
+          </div>
+          <ul className="remind-list">
+            {reminders.slice(0, 6).map(({ m, r, date, days }) => (
+              <li key={r.id} onClick={() => go(m.id, r.id)}>
+                <span className={`chip-icon sm c-${m.id}`}>
+                  <Icon name={m.icon} size={14} />
+                </span>
+                <span className="grow">
+                  <span className="ellipsis block">{label(r.values) || m.itemName}</span>
+                  <span className="muted small ellipsis block">
+                    {m.menu} · {r.status} · tenggat {fmtDate(date)}
+                  </span>
+                </span>
+                <span className={'due ' + dueTone(days)}>{dueLabel(days)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="stats">
         {MODULES.map((m, idx) => {

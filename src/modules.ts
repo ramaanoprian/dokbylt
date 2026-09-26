@@ -11,6 +11,7 @@ export interface Field {
   /** Tampilkan sebagai kolom di tabel daftar. */
   inTable?: boolean;
   placeholder?: string;
+  hint?: string;
 }
 
 export interface ModuleDef {
@@ -33,6 +34,13 @@ export type ModuleId = 'evp' | 'surat' | 'pos' | 'multimedia' | 'arsip';
 
 export const UNITS = ['Rencana', 'Logistik', 'Keuangan', 'SDM', 'Dokumen', 'Lainnya'];
 
+/** Pilihan yang mewajibkan keterangan tambahan. */
+export const OTHER = 'Lainnya';
+/** Kunci penyimpanan keterangan untuk pilihan "Lainnya" pada sebuah field. */
+export const otherKey = (key: string) => `${key}Lainnya`;
+
+const tenggat = (hint: string): Field => ({ key: 'tenggat', label: 'Tenggat', type: 'date', hint });
+
 export const MODULES: ModuleDef[] = [
   {
     id: 'evp',
@@ -45,6 +53,7 @@ export const MODULES: ModuleDef[] = [
     dateField: 'tanggalMasuk',
     fields: [
       { key: 'tanggalMasuk', label: 'Tanggal masuk', type: 'date', required: true, inTable: true },
+      tenggat('Batas dokumen harus sudah kembali ke unit'),
       { key: 'unit', label: 'Unit asal', type: 'select', options: UNITS, required: true, inTable: true },
       {
         key: 'jenis',
@@ -73,6 +82,7 @@ export const MODULES: ModuleDef[] = [
     dateField: 'tanggalTerima',
     fields: [
       { key: 'tanggalTerima', label: 'Tanggal diterima', type: 'date', required: true, inTable: true },
+      tenggat('Batas surat harus sudah didistribusikan'),
       { key: 'nomorSurat', label: 'Nomor surat', type: 'text', inTable: true },
       { key: 'asal', label: 'Asal / pengirim', type: 'text', required: true, inTable: true },
       { key: 'perihal', label: 'Perihal', type: 'text', required: true, inTable: true },
@@ -101,6 +111,7 @@ export const MODULES: ModuleDef[] = [
     dateField: 'tanggal',
     fields: [
       { key: 'tanggal', label: 'Tanggal diterima dari unit', type: 'date', required: true, inTable: true },
+      tenggat('Batas paket harus sudah dikirim'),
       { key: 'unit', label: 'Unit pengirim', type: 'select', options: UNITS, required: true, inTable: true },
       { key: 'pengirim', label: 'Nama pengirim (user)', type: 'text', required: true, inTable: true },
       { key: 'kontak', label: 'Kontak pengirim (WA/email)', type: 'text' },
@@ -123,6 +134,7 @@ export const MODULES: ModuleDef[] = [
     dateField: 'tanggal',
     fields: [
       { key: 'tanggal', label: 'Tanggal kegiatan', type: 'date', required: true, inTable: true },
+      tenggat('Batas hasil dokumentasi harus selesai diolah'),
       { key: 'kegiatan', label: 'Nama kegiatan', type: 'text', required: true, inTable: true },
       { key: 'lokasi', label: 'Lokasi', type: 'text', inTable: true },
       {
@@ -149,6 +161,7 @@ export const MODULES: ModuleDef[] = [
     dateField: 'tanggal',
     fields: [
       { key: 'tanggal', label: 'Tanggal penyerahan', type: 'date', required: true, inTable: true },
+      tenggat('Batas arsip harus sudah disimpan di depo'),
       { key: 'unit', label: 'Unit asal', type: 'select', options: UNITS, required: true, inTable: true },
       { key: 'uraian', label: 'Uraian arsip', type: 'text', required: true, inTable: true },
       { key: 'tahun', label: 'Tahun arsip', type: 'text', placeholder: 'mis. 2019–2021', inTable: true },
