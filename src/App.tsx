@@ -4,6 +4,7 @@ import { Menu } from './Menu';
 import { MODULES, moduleById, type ModuleId } from './modules';
 import { isOnline, useBackend, type DataStore } from './backend';
 import { ModulePage } from './ModulePage';
+import { NotifyTray } from './NotifyTray';
 import { Overview } from './Overview';
 import { ActivityPage, initials } from './ActivityPage';
 import { LoginPage, NamePrompt } from './LoginPage';
@@ -282,6 +283,7 @@ export default function App() {
           </span>
         </div>
       </footer>
+      <NotifyTray userName={userName} />
       {staffOpen && (
         <StaffDialog meId={be.user.id} load={be.listStaff} setRole={be.setStaffRole} onClose={closeStaff} />
       )}

@@ -26,15 +26,28 @@ function waNumber(kontak = '') {
   return digits.startsWith('0') ? '62' + digits.slice(1) : digits;
 }
 
-function message(v: Record<string, string>) {
+function docLine(v: Record<string, string>) {
   const jenis = v.jenis === 'Lainnya' ? v.jenisLainnya || '' : v.jenis || '';
+  return [jenis, v.perihal ? `"${v.perihal}"` : ''].filter(Boolean).join(' ') || 'Dokumen';
+}
+
+// Sama dengan signedMessage di src/util.ts.
+function message(docs: Record<string, string>[], sender: string) {
+  const v = docs[0] ?? {};
+  const unit = v.unit ? ` dari unit ${v.unit}` : '';
+  const body =
+    docs.length > 1
+      ? [`${docs.length} dokumen berikut${unit} sudah ditandatangani EVP:`, ...docs.map((d, i) => `${i + 1}. ${docLine(d)}`)]
+      : [`${docLine(v) === 'Dokumen' ? 'Dokumen' : `Dokumen ${docLine(v)}`}${unit} sudah ditandatangani EVP.`];
   return [
     `Halo ${v.pic || 'Bapak/Ibu'},`,
     '',
-    `Dokumen${jenis ? ` ${jenis}` : ''}${v.perihal ? ` "${v.perihal}"` : ''}${v.unit ? ` dari unit ${v.unit}` : ''} sudah ditandatangani EVP.`,
+    ...body,
+    '',
     'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
     '',
     'Terima kasih,',
+    ...(sender ? [sender] : []),
     'Unit Dokumen Balai Yasa Lahat',
   ].join('\n');
 }
@@ -54,22 +67,39 @@ Deno.serve(async (req) => {
   const { data: user } = await db.auth.getUser();
   if (!user?.user) return json({ error: 'Harus masuk terlebih dahulu' }, 401);
 
-  const { id } = await req.json().catch(() => ({ id: '' }));
-  if (!id) return json({ error: 'id kosong' }, 400);
-  const { data: rec, error } = await db.from('records').select('module, status, values').eq('id', id).single();
-  if (error || !rec) return json({ error: 'Data tidak ditemukan' }, 404);
-  if (!NOTIFY[rec.module]?.includes(rec.status)) return json({ error: 'Data belum di tahap yang perlu dikabari' }, 409);
+  // Satu id, atau beberapa id sekaligus; dokumen dengan nomor WA yang sama digabung jadi satu pesan.
+  const input = await req.json().catch(() => ({}));
+  const ids: string[] = (Array.isArray(input.ids) ? input.ids : input.id ? [input.id] : [])
+    .filter((x: unknown) => typeof x === 'string')
+    .slice(0, 50);
+  if (!ids.length) return json({ error: 'id kosong' }, 400);
+  const { data: recs, error } = await db.from('records').select('id, module, status, values').in('id', ids);
+  if (error || !recs?.length) return json({ error: 'Data tidak ditemukan' }, 404);
 
-  const values = (rec.values ?? {}) as Record<string, string>;
-  const target = waNumber(values.kontakPic);
-  if (!target) return json({ error: 'Nomor WA PIC belum diisi' }, 422);
+  const groups = new Map<string, Record<string, string>[]>();
+  recs.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+  for (const rec of recs) {
+    if (!NOTIFY[rec.module]?.includes(rec.status)) continue;
+    const values = (rec.values ?? {}) as Record<string, string>;
+    const target = waNumber(values.kontakPic);
+    if (target) groups.set(target, [...(groups.get(target) ?? []), values]);
+  }
+  if (!groups.size) return json({ error: 'Belum ada dokumen yang perlu dikabari' }, 409);
 
-  const body = new FormData();
-  body.set('target', target);
-  body.set('message', message(values));
-  body.set('countryCode', '62');
-  const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: token }, body });
-  const out = await res.json().catch(() => ({}));
-  if (!res.ok || out.status === false) return json({ error: out.reason || `Fonnte menolak (${res.status})` }, 502);
-  return json({ ok: true, target });
+  const meta = user.user.user_metadata ?? {};
+  const sender = String(meta.full_name || meta.name || '').trim();
+  const sent: string[] = [];
+  let failure = '';
+  for (const [target, docs] of groups) {
+    const body = new FormData();
+    body.set('target', target);
+    body.set('message', message(docs, sender));
+    body.set('countryCode', '62');
+    const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: token }, body });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || out.status === false) failure = out.reason || `Fonnte menolak (${res.status})`;
+    else sent.push(target);
+  }
+  if (!sent.length) return json({ error: failure }, 502);
+  return json({ ok: true, target: sent.join(','), failed: failure || undefined });
 });

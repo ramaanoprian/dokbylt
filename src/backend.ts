@@ -79,7 +79,7 @@ const supabase: SupabaseClient | null = url && key ? createClient(url, key) : nu
 
 export type NotifyResult = { sent: true; target: string } | { sent: false; reason: string };
 
-/** Perlu kirim WA ke PIC: baru masuk ke tahap pemicu dan nomor PIC terisi. */
+/** Perlu mengabari PIC lewat WA: baru masuk ke tahap pemicu dan nomor PIC terisi. */
 function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord) {
   const def = moduleById(mod);
   if (!def?.notifyStatus || !waNumber(rec.values.kontakPic)) return false;
@@ -92,21 +92,31 @@ function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord) {
   return rec.history.length <= 1;
 }
 
-/** Minta server mengirim WA ke PIC unit lewat fungsi "kabari-pic". */
-async function invokeNotify(id: string): Promise<NotifyResult> {
-  if (!supabase) return { sent: false, reason: 'mode lokal' };
-  const { data, error } = await supabase.functions.invoke('kabari-pic', { body: { id } });
-  if (error) {
-    let reason = error.message;
-    try {
-      const body = await (error as { context?: Response }).context?.json();
-      if (body?.error) reason = body.error;
-    } catch {
-      /* pakai pesan bawaan */
-    }
-    return { sent: false, reason };
+// Token sesi disimpan di sini agar WA yang masih antre tetap bisa dikirim saat halaman ditutup.
+let accessToken = '';
+supabase?.auth.onAuthStateChange((_e, s) => {
+  accessToken = s?.access_token ?? '';
+});
+
+/**
+ * Minta server mengirim WA ke PIC unit lewat fungsi "kabari-pic". Beberapa dokumen untuk nomor
+ * yang sama digabung server menjadi satu pesan berisi daftar.
+ */
+export async function sendNotify(ids: string[], keepalive = false): Promise<NotifyResult> {
+  if (!supabase || !url || !key) return { sent: false, reason: 'mode lokal' };
+  try {
+    const res = await fetch(`${url}/functions/v1/kabari-pic`, {
+      method: 'POST',
+      keepalive,
+      headers: { Authorization: `Bearer ${accessToken || key}`, apikey: key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return { sent: false, reason: body?.error || `server menolak (${res.status})` };
+    return { sent: true, target: body?.target ?? '' };
+  } catch {
+    return { sent: false, reason: 'tidak ada koneksi' };
   }
-  return { sent: true, target: data?.target ?? '' };
 }
 
 /** true bila aplikasi terhubung ke server; false berarti mode lokal (data di browser). */
@@ -329,7 +339,7 @@ export function useBackend() {
     );
 
   const save = useCallback(
-    async (mod: ModuleId, rec: DocRecord, prev?: DocRecord): Promise<NotifyResult | undefined> => {
+    async (mod: ModuleId, rec: DocRecord, prev?: DocRecord): Promise<boolean> => {
       setData((d) => withRecord(d, mod, rec));
       const notify = shouldNotify(mod, rec, prev);
       if (!supabase) {
@@ -341,7 +351,7 @@ export function useBackend() {
           );
           if (changed.length) logLocal(mod, 'ubah data', rec, changed.join(', '));
         }
-        return notify ? { sent: false, reason: 'mode lokal' } : undefined;
+        return notify;
       }
       // Insert dan update dipisah (bukan upsert): trigger BEFORE INSERT ikut jalan pada upsert
       // dan akan mencatat "tambah" palsu di riwayat.
@@ -352,9 +362,9 @@ export function useBackend() {
       if (e) {
         setError('Gagal menyimpan: ' + e.message);
         loadAll();
-        return undefined;
+        return false;
       }
-      return notify ? invokeNotify(rec.id) : undefined;
+      return notify;
     },
     [loadAll],
   );
