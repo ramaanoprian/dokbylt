@@ -129,6 +129,25 @@ export function waNumber(kontak = '') {
 
 export const emailOf = (kontak = '') => kontak.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)?.[0] ?? '';
 
+/** Pesan untuk PIC unit bahwa dokumennya sudah ditandatangani EVP. */
+export function signedMessage(v: Record<string, string>) {
+  return [
+    `Halo ${v.pic || 'Bapak/Ibu'},`,
+    '',
+    `Dokumen${v.jenis ? ` ${v.jenis === 'Lainnya' ? v.jenisLainnya || '' : v.jenis}` : ''}${v.perihal ? ` "${v.perihal}"` : ''}${v.unit ? ` dari unit ${v.unit}` : ''} sudah ditandatangani EVP.`,
+    'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
+    '',
+    'Terima kasih,',
+    'Unit Dokumen Balai Yasa Lahat',
+  ].join('\n');
+}
+
+/** Tautan WA untuk mengabari PIC, atau kosong bila nomornya belum diisi. */
+export function notifyUrl(v: Record<string, string>) {
+  const wa = waNumber(v.kontakPic);
+  return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(v))}` : '';
+}
+
 export function resiMessage(v: Record<string, string>) {
   return [
     `Halo ${v.pengirim || 'Bapak/Ibu'},`,

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, MessageCircle, Printer, X } from 'lucide-react';
 import { OTHER, otherKey, type ModuleDef } from './modules';
 import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
-import { daysUntil, defaultDue, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
+import { daysUntil, defaultDue, notifyUrl, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
 import { Icon } from './icons';
 import { stageClass } from './stats';
 import { Attachments, type FileApi } from './Attachments';
@@ -10,6 +10,8 @@ import { printDisposition, printReceipt } from './print';
 
 interface Props {
   mod: ModuleDef;
+  /** Semua data menu ini, untuk mengingat nomor WA tiap PIC. */
+  rows?: DocRecord[];
   record?: DocRecord;
   userName: string;
   /** Tahap tujuan bila form dibuka karena ada isian wajib yang belum terisi. */
@@ -20,7 +22,7 @@ interface Props {
   files: FileApi;
 }
 
-export function RecordForm({ mod, record, userName, targetStatus, onSave, onDelete, onClose, files }: Props) {
+export function RecordForm({ mod, rows = [], record, userName, targetStatus, onSave, onDelete, onClose, files }: Props) {
   // Id dibuat di awal agar lampiran bisa diunggah sebelum data disimpan.
   const [id] = useState(() => record?.id ?? newId());
   const [values, setValues] = useState<Record<string, string>>(() => {
@@ -44,8 +46,34 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
   const missing = mod.fields.filter((f) => needed.has(f.key) && !values[f.key]?.trim());
   const otherMissing = mod.fields.filter((f) => values[f.key] === OTHER && !values[otherKey(f.key)]?.trim());
   const blocked = missing.length + otherMissing.length > 0;
+  // Buku kontak PIC dari data sebelumnya: nama → nomor WA terakhir yang dipakai.
+  const contacts = useMemo(() => {
+    const map = new Map<string, { name: string; phone: string; unit: string }>();
+    const sorted = [...rows].sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+    for (const r of sorted) {
+      const name = r.values.pic?.trim();
+      const phone = r.values.kontakPic?.trim();
+      if (name && phone) map.set(name.toLowerCase(), { name, phone, unit: r.values.unit ?? '' });
+    }
+    return map;
+  }, [rows]);
+  const [phoneAuto, setPhoneAuto] = useState(false);
+
   const set = (k: string, v: string) => {
     const next = { ...values, [k]: v };
+    if (k === 'kontakPic') setPhoneAuto(false);
+    // Nama PIC yang sudah dikenal: isi nomornya (dan unit bila kosong) otomatis.
+    if (k === 'pic' && mod.fields.some((f) => f.key === 'kontakPic')) {
+      const c = contacts.get(v.trim().toLowerCase());
+      if (c && (!values.kontakPic?.trim() || phoneAuto)) {
+        next.kontakPic = c.phone;
+        if (!next.unit && c.unit) next.unit = c.unit;
+        setPhoneAuto(true);
+      } else if (!c && phoneAuto) {
+        next.kontakPic = '';
+        setPhoneAuto(false);
+      }
+    }
     if (k === 'tenggat') setDueAuto(false);
     else if (k === mod.dateField && dueAuto && mod.fields.some((f) => f.key === 'tenggat')) {
       const due = defaultDue(mod, next);
@@ -185,6 +213,8 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
                     type={f.type}
                     placeholder={f.placeholder}
                     min={f.type === 'number' ? 0 : undefined}
+                    list={f.key === 'pic' && contacts.size ? 'pic-contacts' : undefined}
+                    autoComplete={f.key === 'pic' ? 'off' : undefined}
                     value={values[f.key] ?? ''}
                     onChange={(e) => set(f.key, e.target.value)}
                   />
@@ -192,7 +222,19 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
                 {f.key === 'tenggat' && values.tenggat && mod.statuses.indexOf(status) < mod.statuses.length - 1 && (
                   <span className={'due ' + dueTone(daysUntil(values.tenggat))}>{dueLabel(daysUntil(values.tenggat))}</span>
                 )}
-                {f.key === 'tenggat' && dueAuto && values.tenggat && mod.dueDays ? (
+                {f.key === 'pic' && contacts.size > 0 && (
+                  <datalist id="pic-contacts">
+                    {[...contacts.values()].map((c) => (
+                      <option key={c.name} value={c.name}>
+                        {c.unit ? `${c.unit} · ` : ''}
+                        {c.phone}
+                      </option>
+                    ))}
+                  </datalist>
+                )}
+                {f.key === 'kontakPic' && phoneAuto ? (
+                  <small className="hint ok">Terisi otomatis dari data {values.pic} sebelumnya.</small>
+                ) : f.key === 'tenggat' && dueAuto && values.tenggat && mod.dueDays ? (
                   <small className="hint">
                     Otomatis {mod.dueDays} hari kerja setelah {mod.fields.find((x) => x.key === mod.dateField)?.label.toLowerCase()}
                     , bisa diubah.
@@ -216,6 +258,29 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
               </div>
               <button type="button" className="btn wa" onClick={sendResi} disabled={!canSendResi}>
                 <MessageCircle size={16} /> {mail && !wa ? 'Kirim email' : 'Kirim via WA'}
+              </button>
+            </div>
+          )}
+
+          {mod.notifyStatus && (
+            <div className="resi-box">
+              <div className="grow">
+                <b>Kabari PIC unit</b>
+                <span className="muted small block">
+                  {!waNumber(values.kontakPic)
+                    ? 'Isi No. WA PIC unit agar PIC dikabari otomatis saat dokumen sudah ditandatangani EVP.'
+                    : mod.statuses.indexOf(status) < mod.statuses.indexOf(mod.notifyStatus)
+                      ? `WA terkirim otomatis ke ${values.pic || 'PIC'} saat tahap jadi “${mod.notifyStatus}”.`
+                      : `Kirim ulang kabar ke ${values.pic || 'PIC'} lewat WhatsApp Anda bila perlu.`}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn wa"
+                disabled={!waNumber(values.kontakPic) || mod.statuses.indexOf(status) < mod.statuses.indexOf(mod.notifyStatus)}
+                onClick={() => window.open(notifyUrl(values), '_blank')}
+              >
+                <MessageCircle size={16} /> Kirim via WA
               </button>
             </div>
           )}

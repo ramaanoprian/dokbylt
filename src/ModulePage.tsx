@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Columns3, List, Paperclip, Plus, Search } from 'lucide-react';
 import type { ModuleDef } from './modules';
-import { attachmentsOf, type DocRecord } from './backend';
+import { attachmentsOf, type DocRecord, type NotifyResult } from './backend';
 import { DataMenu } from './DataMenu';
 import { Hero, LocalNav } from './LocalNav';
 import type { FileApi } from './Attachments';
@@ -12,6 +12,7 @@ import { useToast } from './toast';
 import { fmtDays, moduleStats, stageClass } from './stats';
 import {
   daysSince,
+  notifyUrl,
   daysUntil,
   deadlineOf,
   dueLabel,
@@ -32,7 +33,7 @@ interface Props {
   loading: boolean;
   openId?: string;
   onOpened: () => void;
-  onSave: (r: DocRecord, prev?: DocRecord) => void;
+  onSave: (r: DocRecord, prev?: DocRecord) => void | Promise<NotifyResult | undefined>;
   onDelete: (r: DocRecord) => void;
   onRestore: (r: DocRecord) => void;
   onImport: (recs: DocRecord[]) => Promise<string | null>;
@@ -121,6 +122,19 @@ export function ModulePage({
 
   const counts = mod.statuses.map((s) => rows.filter((r) => r.status === s).length);
 
+  // Kabar hasil WA otomatis ke PIC; bila gagal, sediakan kirim manual satu klik.
+  const saveAndNotify = (r: DocRecord, prev?: DocRecord) =>
+    Promise.resolve(onSave(r, prev)).then((res) => {
+      if (!res) return;
+      const who = r.values.pic || 'PIC unit';
+      if (res.sent) toast(`WA terkirim otomatis ke ${who}`);
+      else
+        toast(`WA ke ${who} belum terkirim (${res.reason})`, {
+          label: 'Kirim via WA',
+          run: () => window.open(notifyUrl(r.values), '_blank'),
+        });
+    });
+
   const moveTo = (r: DocRecord, next: string) => {
     const nextIdx = mod.statuses.indexOf(next);
     // Isian wajib hanya dicek saat maju, tidak saat dikembalikan ke tahap sebelumnya.
@@ -137,7 +151,7 @@ export function ModulePage({
       updatedBy: userName,
       history: [...r.history, { status: next, at: now, by: userName }],
     };
-    onSave(moved, r);
+    saveAndNotify(moved, r);
     toast(`Dipindah ke “${next}”`, {
       label: 'Urungkan',
       run: () => {
@@ -423,12 +437,13 @@ export function ModulePage({
         {editing && (
           <RecordForm
             mod={mod}
+            rows={rows}
             record={editing.record}
             userName={userName}
             targetStatus={editing.targetStatus}
             onClose={() => setEditing(null)}
             onSave={(r) => {
-              onSave(r, editing.record);
+              saveAndNotify(r, editing.record);
               setEditing(null);
               toast(
                 editing.record
