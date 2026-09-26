@@ -94,12 +94,14 @@
 [data-mod='pos'] { --accent: #e86a00; --accent-2: #ffb340; }
 [data-mod='multimedia'] { --accent: #d70f4b; --accent-2: #ff6482; }
 [data-mod='arsip'] { --accent: #0f8fb0; --accent-2: #5ac8fa; }
+[data-mod='drone'] { --accent: #9b2fcf; --accent-2: #d17bff; }
 :root[data-theme='dark'] [data-mod='evp'] { --accent: #2997ff; }
 :root[data-theme='dark'] [data-mod='surat'] { --accent: #30d158; }
 :root[data-theme='dark'] [data-mod='keluar'] { --accent: #8e8cff; }
 :root[data-theme='dark'] [data-mod='pos'] { --accent: #ff9f0a; }
 :root[data-theme='dark'] [data-mod='multimedia'] { --accent: #ff5a7e; }
 :root[data-theme='dark'] [data-mod='arsip'] { --accent: #40c8e0; }
+:root[data-theme='dark'] [data-mod='drone'] { --accent: #bf5af2; }
 
 * { box-sizing: border-box; }
 html {
@@ -842,3 +844,43 @@ tr:hover td.actions .btn, td.actions .btn:focus-visible { opacity: 1; }
   .login-card { margin-top: -60px; padding: 30px 22px 24px; }
   .login-card h2 { font-size: 1.5rem; }
 }
+
+/* Halaman publik pinjam drone (tanpa login) */
+.public { min-height: 100vh; min-height: 100dvh; background: var(--bg); padding: 0 16px 48px; }
+.public-head { display: flex; align-items: center; gap: 12px; max-width: 640px; margin: 0 auto; padding: 22px 4px 18px; }
+.public-head .app-icon { width: 40px; height: 40px; border-radius: 11px; }
+.public-card { max-width: 640px; margin: 0 auto; background: var(--surface); border-radius: 22px; box-shadow: var(--card-shadow); padding: 36px 36px 32px; display: flex; flex-direction: column; gap: 14px; animation: rise 0.7s var(--ease) both; }
+.public-card h1 { font-size: 2.4rem; letter-spacing: -0.025em; line-height: 1.08; }
+.public-card .lead { font-size: 1.06rem; margin-bottom: 8px; }
+.public-card .form-grid { margin-top: 6px; }
+.public-card.done { align-items: flex-start; }
+.done-mark { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--s-done); }
+.busy { background: var(--fill-2); border-radius: 14px; padding: 14px 16px; font-size: 0.92rem; }
+.busy ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.busy li { display: flex; justify-content: space-between; gap: 12px; }
+.choice { border: 0; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.choice legend { font-size: 0.875rem; font-weight: 500; color: var(--text-2); margin-bottom: 8px; padding: 0; }
+.form-grid .choice label { flex-direction: row; align-items: center; gap: 10px; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--hair); cursor: pointer; color: var(--text); font-size: 0.94rem; }
+.form-grid .choice label.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.form-grid > .full { grid-column: 1 / -1; }
+.choice input { width: auto; min-height: 0; padding: 0; margin: 0; border: 0; box-shadow: none; accent-color: var(--accent); flex: none; }
+.choice input:focus { box-shadow: none; }
+.public-card .notice { margin: 0; }
+.trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.track { list-style: none; margin: 12px 0 4px; padding: 0; display: grid; gap: 0; }
+.track li { display: flex; gap: 14px; align-items: flex-start; position: relative; padding-bottom: 18px; color: var(--muted); }
+.track li:not(:last-child)::before { content: ''; position: absolute; left: 13px; top: 30px; bottom: 2px; width: 2px; background: var(--hair); }
+.track li.past:not(:last-child)::before { background: var(--accent); }
+.track .dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 0.8rem; font-weight: 600; background: var(--fill-2); }
+.track li.past, .track li.on { color: var(--text); }
+.track li.past .dot { background: var(--accent); color: #fff; }
+.track li.on .dot { background: var(--accent); color: #fff; box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 20%, transparent); }
+@media (max-width: 640px) {
+  .public-card { padding: 28px 20px 24px; border-radius: 20px; }
+  .public-card h1 { font-size: 2rem; }
+  .public-card .form-grid, .choice { grid-template-columns: 1fr; }
+}
+.qr-body { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.qr-body img, .qr-ph { width: min(300px, 100%); aspect-ratio: 1; border-radius: 16px; background: #fff; padding: 12px; box-shadow: inset 0 0 0 1px var(--hair); }
+.qr-body code { font-size: 0.8rem; color: var(--muted); word-break: break-all; text-align: center; }
+.qr-sheet .sheet-head p { margin-top: 6px; }

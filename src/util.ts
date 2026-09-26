@@ -87,6 +87,9 @@ export function deadlineOf(mod: ModuleDef, r: DocRecord): string | undefined {
   if (isDone(mod, r)) return undefined;
   // Kegiatan multimedia yang belum diliput: tanggal kegiatannya adalah tenggat.
   if (mod.id === 'multimedia' && r.status === mod.statuses[0] && r.values.tanggal) return r.values.tanggal;
+  // Drone: sebelum dipinjam tenggatnya tanggal pakai, sesudahnya rencana kembali.
+  if (mod.id === 'drone')
+    return (r.status === 'Dipinjam' ? r.values.tanggalKembali || r.values.tanggalPakai : r.values.tanggalPakai) || undefined;
   return r.values.tenggat || undefined;
 }
 

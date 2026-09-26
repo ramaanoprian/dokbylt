@@ -22,7 +22,7 @@ interface Props {
   toggleTheme: () => void;
 }
 
-const label = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.tujuan || v.asal || '(tanpa judul)';
+const label = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.keperluan || v.tujuan || v.asal || '(tanpa judul)';
 
 export function CommandPalette({ data, dark, onClose, go, toggleTheme }: Props) {
   const [q, setQ] = useState('');

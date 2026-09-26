@@ -62,6 +62,8 @@ function parties(mod: ModuleDef, r: DocRecord): [string, string] {
       return [`${v.pengirim || '…'} (Unit ${shown(mod.fields.find((f) => f.key === 'unit')!, v) || '…'})`, 'Unit Dokumen'];
     case 'arsip':
       return [`Unit ${shown(mod.fields.find((f) => f.key === 'unit')!, v) || '…'}`, 'Unit Dokumen (Depo Arsip)'];
+    case 'drone':
+      return ['Unit Dokumen', `${v.pic || '…'} (Unit ${shown(mod.fields.find((f) => f.key === 'unit')!, v) || '…'})`];
     default:
       return ['', 'Unit Dokumen'];
   }
@@ -83,7 +85,7 @@ export function printReceipt(mod: ModuleDef, r: DocRecord) {
   <td>Lahat, ${esc(fmtDate(new Date().toISOString()))}<br>Yang menerima,<div class="line" style="margin-top:44px">${esc(to)}</div></td>
 </tr></table>
 <p class="foot">Dokumen ini dibuat dari Dashboard Dokumen BYLT.</p>`;
-  open(page(`Tanda terima – ${r.values.perihal || r.values.kegiatan || r.values.uraian || mod.itemName}`, body));
+  open(page(`Tanda terima – ${r.values.perihal || r.values.kegiatan || r.values.uraian || r.values.keperluan || mod.itemName}`, body));
 }
 
 export function printDisposition(mod: ModuleDef, r: DocRecord) {

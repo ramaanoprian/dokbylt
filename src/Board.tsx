@@ -11,7 +11,7 @@ interface Props {
   onMove: (r: DocRecord, status: string) => void;
 }
 
-const titleOf = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.tujuan || v.asal || '(tanpa judul)';
+const titleOf = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.keperluan || v.tujuan || v.asal || '(tanpa judul)';
 
 export function Board({ mod, rows, onOpen, onMove }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);

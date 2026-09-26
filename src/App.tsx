@@ -106,6 +106,26 @@ export default function App() {
     );
   }, [reminders, be.loading, be.user, toast, go]);
 
+  // Pengajuan pinjam drone dari formulir publik masuk lewat sinkronisasi: beri tahu staf.
+  const seenDrone = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (be.loading || !be.user) return;
+    const rows = be.data.drone ?? [];
+    if (!seenDrone.current) {
+      seenDrone.current = new Set(rows.map((r) => r.id));
+      return;
+    }
+    for (const r of rows) {
+      if (seenDrone.current.has(r.id)) continue;
+      seenDrone.current.add(r.id);
+      if (r.status === 'Diajukan' && r.createdBy !== be.user.name)
+        toast(`Pengajuan pinjam drone baru dari ${r.values.pic || 'unit'} (${r.values.unitLainnya || r.values.unit || '–'})`, {
+          label: 'Lihat',
+          run: () => go('drone', r.id),
+        });
+    }
+  }, [be.data.drone, be.loading, be.user, toast, go]);
+
   if (!be.authReady) return <div className="splash" />;
   if (!be.user) return <LoginPage onSignIn={be.signIn} />;
   if (isOnline && !be.user.name) return <NamePrompt email={be.user.email} onSave={be.setName} />;

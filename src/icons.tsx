@@ -1,6 +1,7 @@
 import {
   Archive,
   Camera,
+  Drone,
   History,
   LayoutDashboard,
   Mail,
@@ -18,6 +19,7 @@ export const ICONS = {
   pos: Package,
   multimedia: Camera,
   arsip: Archive,
+  drone: Drone,
   aktivitas: History,
 } satisfies Record<string, LucideIcon>;
 

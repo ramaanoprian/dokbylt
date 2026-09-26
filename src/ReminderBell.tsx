@@ -7,7 +7,7 @@ import { Icon } from "./icons";
 import { dueLabel, dueTone, fmtDate } from "./util";
 
 const label = (v: Record<string, string>) =>
-  v.perihal || v.kegiatan || v.uraian || v.tujuan || v.asal || "";
+  v.perihal || v.kegiatan || v.uraian || v.keperluan || v.tujuan || v.asal || "";
 
 export function ReminderBell({
   items,
