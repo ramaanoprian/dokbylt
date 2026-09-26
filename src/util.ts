@@ -130,22 +130,37 @@ export function waNumber(kontak = '') {
 export const emailOf = (kontak = '') => kontak.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)?.[0] ?? '';
 
 /** Pesan untuk PIC unit bahwa dokumennya sudah ditandatangani EVP. */
-export function signedMessage(v: Record<string, string>) {
+/** Satu baris dokumen untuk pesan WA, mis. `RAB "Pengadaan bogie"`. */
+export function docLine(v: Record<string, string>) {
+  const jenis = v.jenis === 'Lainnya' ? v.jenisLainnya || '' : v.jenis || '';
+  return [jenis, v.perihal ? `"${v.perihal}"` : ''].filter(Boolean).join(' ') || 'Dokumen';
+}
+
+/** Pesan WA untuk PIC unit: satu dokumen, atau daftar bila beberapa dokumen sekaligus. */
+export function signedMessage(docs: Record<string, string>[], sender = '') {
+  const v = docs[0] ?? {};
+  const unit = v.unit ? ` dari unit ${v.unit}` : '';
+  const body =
+    docs.length > 1
+      ? [`${docs.length} dokumen berikut${unit} sudah ditandatangani EVP:`, ...docs.map((d, i) => `${i + 1}. ${docLine(d)}`)]
+      : [`${docLine(v) === 'Dokumen' ? 'Dokumen' : `Dokumen ${docLine(v)}`}${unit} sudah ditandatangani EVP.`];
   return [
     `Halo ${v.pic || 'Bapak/Ibu'},`,
     '',
-    `Dokumen${v.jenis ? ` ${v.jenis === 'Lainnya' ? v.jenisLainnya || '' : v.jenis}` : ''}${v.perihal ? ` "${v.perihal}"` : ''}${v.unit ? ` dari unit ${v.unit}` : ''} sudah ditandatangani EVP.`,
+    ...body,
+    '',
     'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
     '',
     'Terima kasih,',
+    ...(sender ? [sender] : []),
     'Unit Dokumen Balai Yasa Lahat',
   ].join('\n');
 }
 
 /** Tautan WA untuk mengabari PIC, atau kosong bila nomornya belum diisi. */
-export function notifyUrl(v: Record<string, string>) {
-  const wa = waNumber(v.kontakPic);
-  return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(v))}` : '';
+export function notifyUrl(docs: Record<string, string>[], sender = '') {
+  const wa = waNumber(docs[0]?.kontakPic);
+  return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(docs, sender))}` : '';
 }
 
 export function resiMessage(v: Record<string, string>) {

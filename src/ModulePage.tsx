@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Columns3, List, Paperclip, Plus, Search } from 'lucide-react';
 import type { ModuleDef } from './modules';
-import { attachmentsOf, type DocRecord, type NotifyResult } from './backend';
+import { attachmentsOf, type DocRecord } from './backend';
+import { cancelNotify, queueNotify } from './notifyQueue';
 import { DataMenu } from './DataMenu';
 import { Hero, LocalNav } from './LocalNav';
 import type { FileApi } from './Attachments';
@@ -12,7 +13,6 @@ import { useToast } from './toast';
 import { fmtDays, moduleStats, stageClass } from './stats';
 import {
   daysSince,
-  notifyUrl,
   daysUntil,
   deadlineOf,
   dueLabel,
@@ -33,7 +33,7 @@ interface Props {
   loading: boolean;
   openId?: string;
   onOpened: () => void;
-  onSave: (r: DocRecord, prev?: DocRecord) => void | Promise<NotifyResult | undefined>;
+  onSave: (r: DocRecord, prev?: DocRecord) => void | Promise<boolean>;
   onDelete: (r: DocRecord) => void;
   onRestore: (r: DocRecord) => void;
   onImport: (recs: DocRecord[]) => Promise<string | null>;
@@ -122,17 +122,12 @@ export function ModulePage({
 
   const counts = mod.statuses.map((s) => rows.filter((r) => r.status === s).length);
 
-  // Kabar hasil WA otomatis ke PIC; bila gagal, sediakan kirim manual satu klik.
+  // WA ke PIC tidak langsung dikirim: masuk antrean agar beberapa dokumen digabung jadi satu pesan.
   const saveAndNotify = (r: DocRecord, prev?: DocRecord) =>
-    Promise.resolve(onSave(r, prev)).then((res) => {
-      if (!res) return;
-      const who = r.values.pic || 'PIC unit';
-      if (res.sent) toast(`WA terkirim otomatis ke ${who}`);
-      else
-        toast(`WA ke ${who} belum terkirim (${res.reason})`, {
-          label: 'Kirim via WA',
-          run: () => window.open(notifyUrl(r.values), '_blank'),
-        });
+    Promise.resolve(onSave(r, prev)).then((notify) => {
+      if (notify) queueNotify(r);
+      else if (mod.notifyStatus && mod.statuses.indexOf(r.status) < mod.statuses.indexOf(mod.notifyStatus))
+        cancelNotify(r.id);
     });
 
   const moveTo = (r: DocRecord, next: string) => {
@@ -156,7 +151,7 @@ export function ModulePage({
       label: 'Urungkan',
       run: () => {
         const t = new Date().toISOString();
-        onSave(
+        saveAndNotify(
           {
             ...moved,
             status: r.status,
