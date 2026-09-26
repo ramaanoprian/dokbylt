@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, FileSpreadsheet, FileUp, MoreHorizontal, X } from 'lucide-react';
+import { ChevronDown, Download, FileSpreadsheet, FileUp, X } from 'lucide-react';
 import type { ModuleDef } from './modules';
 import type { DocRecord } from './backend';
 import { exportCsv } from './util';
@@ -64,12 +64,12 @@ export function DataMenu({ mod, rows, userName, onImport }: Props) {
   return (
     <>
       <div className="menu-wrap" ref={ref}>
-        <button className="btn ghost" onClick={() => setOpen(!open)} aria-expanded={open} title="Unduh atau impor data">
-          <MoreHorizontal size={16} /> <span className="hide-sm">Data</span>
+        <button className="btn" onClick={() => setOpen(!open)} aria-expanded={open} title="Unduh atau impor data">
+          <FileSpreadsheet size={16} /> <span className="hide-sm">Ekspor / Impor</span> <ChevronDown size={14} className="hide-sm" />
         </button>
         {open && (
-          <div className="menu-pop" role="menu">
-            {item(<FileSpreadsheet size={16} />, 'Unduh Excel', () => exportXlsx(mod, rows))}
+          <div className="menu-pop right" role="menu">
+            {item(<FileSpreadsheet size={16} />, 'Unduh Excel (.xlsx)', () => exportXlsx(mod, rows))}
             {item(<Download size={16} />, 'Unduh CSV', () => exportCsv(mod, rows))}
             <hr />
             {item(<FileUp size={16} />, 'Impor dari Excel/CSV…', () => fileRef.current?.click())}

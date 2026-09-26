@@ -118,213 +118,207 @@ export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onS
 
   const showSkeleton = loading && rows.length === 0;
 
+  const tabs: [string, string, number][] = [
+    ['aktif', 'Berjalan', rows.filter((r) => !isDone(mod, r)).length],
+    ...mod.statuses.map((st, i): [string, string, number] => [st, st, counts[i]]),
+    ['semua', 'Semua', rows.length],
+  ];
+
   return (
     <section className="page">
       <header className="page-head">
-        <div className="page-title">
-          <span className={`chip-icon c-${mod.id}`}>
-            <Icon name={mod.icon} size={22} />
-          </span>
-          <div>
-            <h1>{mod.title}</h1>
-            <p className="muted">{mod.description}</p>
-          </div>
+        <div>
+          <h1>{mod.title}</h1>
+          <p className="muted">{mod.description}</p>
         </div>
-        <button className="btn primary add-btn" onClick={() => setEditing({})} title="Pintasan: N">
-          <Plus size={18} /> Tambah {mod.itemName}
-        </button>
+        <div className="head-actions">
+          <button className="btn primary add-btn" onClick={() => setEditing({})} title="Pintasan: N">
+            <Plus size={16} /> Tambah {mod.itemName}
+          </button>
+        </div>
       </header>
 
-      <div className="flow">
-        {mod.statuses.map((s, i) => (
-          <button
-            key={s}
-            className={'flow-step' + (statusFilter === s ? ' active' : '')}
-            onClick={() => {
-              setView('tabel');
-              setStatusFilter(statusFilter === s ? 'aktif' : s);
-            }}
-          >
-            <span className="flow-count">{counts[i]}</span>
-            <span className="flow-label">
-              <span className="muted small hide-sm">Tahap {i + 1}</span>
-              {s}
-            </span>
-            <span
-              className="flow-fill"
-              style={{ width: `${rows.length ? (100 * counts[i]) / rows.length : 0}%` }}
-              aria-hidden
-            />
-            {i < mod.statuses.length - 1 && <ChevronRight className="flow-arrow" size={16} />}
-          </button>
-        ))}
-      </div>
-
-      <div className="toolbar-bar">
-        <div className="search">
-          <Search size={16} />
-          <input type="search" placeholder={`Cari ${mod.itemName}…`} value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        {view === 'tabel' && (
-          <div className="segmented">
-            {[
-              ['aktif', 'Berjalan'],
-              ['semua', 'Semua'],
-            ].map(([v, l]) => (
-              <button key={v} className={statusFilter === v ? 'on' : ''} onClick={() => setStatusFilter(v)}>
-                {l}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="segmented" role="tablist" aria-label="Tampilan">
-          <button className={view === 'tabel' ? 'on' : ''} onClick={() => setView('tabel')} title="Tabel">
-            <List size={16} /> <span className="hide-sm">Tabel</span>
-          </button>
-          <button className={view === 'papan' ? 'on' : ''} onClick={() => setView('papan')} title="Papan">
-            <Columns3 size={16} /> <span className="hide-sm">Papan</span>
-          </button>
-        </div>
-        <DataMenu
-          mod={mod}
-          rows={view === 'papan' ? searched : filtered}
-          userName={userName}
-          onImport={async (recs) => {
-            const e = await onImport(recs);
-            if (!e) toast(`${recs.length} ${mod.itemName} berhasil diimpor`);
-            return e;
-          }}
-        />
-      </div>
-
-      {showSkeleton ? (
-        <div className="card">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="skeleton-row">
-              <span className="sk w20" />
-              <span className="sk w40" />
-              <span className="sk w15" />
+      <div className="panel">
+        <div className="panel-bar">
+          {view === 'tabel' ? (
+            <div className="tabs" role="tablist" aria-label="Saring menurut tahap">
+              {tabs.map(([v, l, n], i) => (
+                <button
+                  key={v}
+                  role="tab"
+                  aria-selected={statusFilter === v}
+                  className={statusFilter === v ? 'on' : ''}
+                  onClick={() => setStatusFilter(v)}
+                >
+                  {i > 0 && i <= mod.statuses.length && <span className="tab-step">{i}</span>}
+                  {l}
+                  <span className="tab-count">{n}</span>
+                </button>
+              ))}
             </div>
-          ))}
-        </div>
-      ) : view === 'papan' ? (
-        <Board mod={mod} rows={searched} onOpen={(r) => setEditing({ record: r })} onMove={moveTo} />
-      ) : filtered.length === 0 ? (
-        <div className="card empty">
-          <span className={`chip-icon big c-${mod.id}`}>
-            <Icon name={mod.icon} size={28} />
-          </span>
-          <p>{rows.length === 0 ? `Belum ada ${mod.itemName} yang dicatat.` : 'Tidak ada data yang cocok.'}</p>
-          {rows.length === 0 && (
-            <button className="btn primary" onClick={() => setEditing({})}>
-              <Plus size={16} /> Catat {mod.itemName} pertama
-            </button>
+          ) : (
+            <p className="muted small bar-note">Seret kartu ke kolom lain untuk memindahkan tahap.</p>
           )}
         </div>
-      ) : (
-        <div className="card table-wrap">
-          <table>
-            <thead>
-              <tr>
-                {cols.map((c) => (
-                  <th key={c.key}>{c.label}</th>
-                ))}
-                <th>Tahap</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
+        <div className="toolbar">
+          <div className="search">
+            <Search size={15} />
+            <input type="search" placeholder={`Cari ${mod.itemName}…`} value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <span className="push" />
+          <div className="segmented" role="tablist" aria-label="Tampilan">
+            <button className={view === 'tabel' ? 'on' : ''} onClick={() => setView('tabel')} title="Tabel">
+              <List size={15} /> <span className="hide-sm">Tabel</span>
+            </button>
+            <button className={view === 'papan' ? 'on' : ''} onClick={() => setView('papan')} title="Papan">
+              <Columns3 size={15} /> <span className="hide-sm">Papan</span>
+            </button>
+          </div>
+          <DataMenu
+            mod={mod}
+            rows={view === 'papan' ? searched : filtered}
+            userName={userName}
+            onImport={async (recs) => {
+              const e = await onImport(recs);
+              if (!e) toast(`${recs.length} ${mod.itemName} berhasil diimpor`);
+              return e;
+            }}
+          />
+        </div>
+
+        {showSkeleton ? (
+          <div>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="skeleton-row">
+                <span className="sk w20" />
+                <span className="sk w40" />
+                <span className="sk w15" />
+              </div>
+            ))}
+          </div>
+        ) : view === 'papan' ? (
+          <div className="panel-body">
+            <Board mod={mod} rows={searched} onOpen={(r) => setEditing({ record: r })} onMove={moveTo} />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="empty">
+            <Icon name={mod.icon} size={24} />
+            <p>{rows.length === 0 ? `Belum ada ${mod.itemName} yang dicatat.` : 'Tidak ada data yang cocok dengan saringan ini.'}</p>
+            {rows.length === 0 && (
+              <button className="btn primary" onClick={() => setEditing({})}>
+                <Plus size={16} /> Catat {mod.itemName} pertama
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  {cols.map((c) => (
+                    <th key={c.key}>{c.label}</th>
+                  ))}
+                  <th>Tahap</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r) => {
+                  const idx = mod.statuses.indexOf(r.status);
+                  const done = isDone(mod, r);
+                  const age = daysSince(lastMove(r));
+                  const due = deadlineOf(mod, r);
+                  const dueDays = due ? daysUntil(due) : undefined;
+                  const clip = attachmentsOf(r.values).length > 0;
+                  return (
+                    <tr key={r.id} onClick={() => setEditing({ record: r })}>
+                      {cols.map((c, ci) => (
+                        <td key={c.key} className={c.type === 'date' ? 'nowrap' : TITLE_KEYS.includes(c.key) ? 'strong' : ''}>
+                          {ci === cols.length - 1 && clip && <Paperclip size={13} className="clip" aria-label="Ada lampiran" />}
+                          {c.type === 'date' ? fmtDate(r.values[c.key]) : shown(c, r.values) || <span className="muted">–</span>}
+                        </td>
+                      ))}
+                      <td className="status-cell">
+                        <span className={'pill ' + (done ? 'done' : idx === 0 ? 'new' : 'mid')}>{r.status}</span>
+                        {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
+                          <span className={'due ' + dueTone(dueDays)} title={`Tenggat ${fmtDate(due)}`}>
+                            {dueLabel(dueDays)}
+                          </span>
+                        ) : (
+                          !done && age >= 3 && <span className="due stale">{age} hari di tahap ini</span>
+                        )}
+                      </td>
+                      <td className="actions" onClick={(e) => e.stopPropagation()}>
+                        {!done && (
+                          <button className="btn small" onClick={() => moveTo(r, mod.statuses[idx + 1])} title={`Pindahkan ke ${mod.statuses[idx + 1]}`}>
+                            {mod.statuses[idx + 1]} <ChevronRight size={14} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {/* Di HP data tampil sebagai daftar ringkas, bukan tabel. */}
+            <ul className="mlist">
               {filtered.map((r) => {
                 const idx = mod.statuses.indexOf(r.status);
                 const done = isDone(mod, r);
                 const age = daysSince(lastMove(r));
                 const due = deadlineOf(mod, r);
                 const dueDays = due ? daysUntil(due) : undefined;
+                const titleKey = TITLE_KEYS.find((k) => cols.some((c) => c.key === k) && r.values[k]);
+                const meta = cols
+                  .filter((c) => c.key !== titleKey && r.values[c.key])
+                  .map((c) => (c.type === 'date' ? fmtDate(r.values[c.key]) : shown(c, r.values)));
                 return (
-                  <tr key={r.id} onClick={() => setEditing({ record: r })} className="row-in">
-                    {cols.map((c) => (
-                      <td key={c.key} data-label={c.label}>
-                        {c.type === 'date' ? fmtDate(r.values[c.key]) : shown(c, r.values) || '–'}
-                      </td>
-                    ))}
-                    <td data-label="Tahap">
-                      <span className="progress-dots" aria-hidden>
-                        {mod.statuses.map((_, i) => (
-                          <i key={i} className={i <= idx ? (done ? 'on done' : 'on') : ''} />
-                        ))}
+                  <li key={r.id} className="mcard" onClick={() => setEditing({ record: r })}>
+                    <div className="mcard-main">
+                      <b className="mcard-title">
+                        {attachmentsOf(r.values).length > 0 && <Paperclip size={13} className="clip" aria-label="Ada lampiran" />}
+                        {(titleKey && r.values[titleKey]) || mod.itemName}
+                      </b>
+                      {meta.length > 0 && <span className="mcard-meta">{meta.join(' · ')}</span>}
+                      <span className="mcard-tags">
+                        <span className={'pill ' + (done ? 'done' : idx === 0 ? 'new' : 'mid')}>{r.status}</span>
+                        {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
+                          <span className={'due ' + dueTone(dueDays)}>{dueLabel(dueDays)}</span>
+                        ) : (
+                          !done && age >= 3 && <span className="due stale">{age} hari</span>
+                        )}
                       </span>
-                      <span className={'pill ' + (done ? 'done' : idx === 0 ? 'new' : 'mid')}>{r.status}</span>
-                      {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
-                        <span className={'due ' + dueTone(dueDays)} title={`Tenggat ${fmtDate(due)}`}>
-                          {dueLabel(dueDays)}
-                        </span>
-                      ) : (
-                        !done && age >= 3 && <span className="age">{age} hari di tahap ini</span>
-                      )}
-                    </td>
-                    <td className="actions" onClick={(e) => e.stopPropagation()}>
-                      {!done && (
-                        <button className="btn small" onClick={() => moveTo(r, mod.statuses[idx + 1])}>
-                          {mod.statuses[idx + 1]} <ChevronRight size={14} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                    </div>
+                    {!done ? (
+                      <button
+                        className="mcard-next"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          moveTo(r, mod.statuses[idx + 1]);
+                        }}
+                        aria-label={`Pindahkan ke ${mod.statuses[idx + 1]}`}
+                        title={mod.statuses[idx + 1]}
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                    ) : (
+                      <ChevronRight className="mcard-chev" size={18} aria-hidden />
+                    )}
+                  </li>
                 );
               })}
-            </tbody>
-          </table>
-          {/* Di HP data tampil sebagai daftar kartu ringkas, bukan tabel. */}
-          <ul className="mlist">
-            {filtered.map((r) => {
-              const idx = mod.statuses.indexOf(r.status);
-              const done = isDone(mod, r);
-              const age = daysSince(lastMove(r));
-              const due = deadlineOf(mod, r);
-              const dueDays = due ? daysUntil(due) : undefined;
-              const titleKey = TITLE_KEYS.find((k) => cols.some((c) => c.key === k) && r.values[k]);
-              const meta = cols
-                .filter((c) => c.key !== titleKey && r.values[c.key])
-                .map((c) => (c.type === 'date' ? fmtDate(r.values[c.key]) : shown(c, r.values)));
-              return (
-                <li key={r.id} className="mcard row-in" onClick={() => setEditing({ record: r })}>
-                  <div className="mcard-main">
-                    <b className="mcard-title">
-                      {attachmentsOf(r.values).length > 0 && <Paperclip size={13} className="mcard-clip" aria-label="Ada lampiran" />}{(titleKey && r.values[titleKey]) || mod.itemName}</b>
-                    {meta.length > 0 && <span className="mcard-meta">{meta.join(' · ')}</span>}
-                    <span className="mcard-tags">
-                      <span className={'pill ' + (done ? 'done' : idx === 0 ? 'new' : 'mid')}>{r.status}</span>
-                      {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
-                        <span className={'due ' + dueTone(dueDays)}>{dueLabel(dueDays)}</span>
-                      ) : (
-                        !done && age >= 3 && <span className="age">{age} hari</span>
-                      )}
-                    </span>
-                  </div>
-                  {!done ? (
-                    <button
-                      className="mcard-next"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        moveTo(r, mod.statuses[idx + 1]);
-                      }}
-                      aria-label={`Pindahkan ke ${mod.statuses[idx + 1]}`}
-                      title={mod.statuses[idx + 1]}
-                    >
-                      <ChevronRight size={18} />
-                    </button>
-                  ) : (
-                    <ChevronRight className="mcard-chev" size={18} aria-hidden />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+            </ul>
+          </div>
+        )}
+        {view === 'tabel' && filtered.length > 0 && (
+          <div className="panel-foot muted small">
+            {filtered.length} dari {rows.length} {mod.itemName}
+          </div>
+        )}
+      </div>
 
       <button className="fab" onClick={() => setEditing({})} aria-label={`Tambah ${mod.itemName}`}>
-        <Plus size={26} />
+        <Plus size={24} />
       </button>
 
       {editing && (

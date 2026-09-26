@@ -49,11 +49,7 @@ export function ActivityLine({ a, showDate, onOpen }: { a: Activity; showDate?: 
         <span className="muted small block">{describeDetail(a)}</span>
       </span>
       <span className="meta">
-        {mod && (
-          <span className={`chip-icon sm c-${mod.id}`} title={mod.title}>
-            <Icon name={mod.icon} size={14} />
-          </span>
-        )}
+        {mod && <span className="tag hide-sm">{mod.menu}</span>}
         <span className="muted small">{showDate ? fmtDate(a.at) + ' ' : ''}{fmtTime(a.at)}</span>
       </span>
     </li>
@@ -83,23 +79,18 @@ export function ActivityPage({ activity, go }: { activity: Activity[]; go: (m: A
   }, [activity, who, mod, q]);
 
   return (
-    <section>
+    <section className="page">
       <header className="page-head">
-        <div className="page-title">
-          <span className="chip-icon c-aktivitas">
-            <Icon name="aktivitas" size={22} />
-          </span>
-          <div>
-            <h1>Riwayat Aktivitas</h1>
-            <p className="muted">
-              Setiap penambahan, perubahan, perpindahan tahap, dan penghapusan tercatat otomatis beserta akun yang
-              melakukannya.
-            </p>
-          </div>
+        <div>
+          <h1>Riwayat Aktivitas</h1>
+          <p className="muted">
+            Setiap penambahan, perubahan, perpindahan tahap, dan penghapusan tercatat otomatis beserta akun yang
+            melakukannya.
+          </p>
         </div>
       </header>
 
-      <div className="card">
+      <div className="panel">
         <div className="toolbar">
           <div className="search">
             <Search size={16} />
@@ -122,14 +113,14 @@ export function ActivityPage({ activity, go }: { activity: Activity[]; go: (m: A
         </div>
         {groups.length === 0 ? (
           <div className="empty">
-            <Icon name="aktivitas" size={28} />
+            <Icon name="aktivitas" size={24} />
             <p>Belum ada aktivitas yang cocok.</p>
           </div>
         ) : (
           groups.map(([day, items]) => (
             <div key={day} className="day">
               <h3 className="day-head">{day}</h3>
-              <ul className="rows">
+              <ul className="list">
                 {items.map((a) => (
                   <ActivityLine key={a.id} a={a} onOpen={a.recordId ? () => go(a.module, a.recordId) : undefined} />
                 ))}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CloudOff, Download, KeyRound, LogOut, Menu, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
+import { ChevronRight, ChevronsUpDown, CloudOff, Download, FileText, KeyRound, LogOut, Menu as Menu2, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
+import { Menu } from './Menu';
 import { MODULES, moduleById, type ModuleId } from './modules';
 import { isOnline, useBackend, type DataStore } from './backend';
 import { Icon } from './icons';
@@ -45,7 +46,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#000000' : '#f5f5f7');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#161a22' : '#ffffff');
   }, [dark]);
 
   const toggleTheme = useCallback(() => {
@@ -125,35 +126,64 @@ export default function App() {
   };
 
   const navItem = (id: Page, icon: Parameters<typeof Icon>[0]['name'], text: string, count?: number) => (
-    <button key={id} className={page === id ? 'active' : ''} onClick={() => go(id)}>
-      <Icon name={icon} />
+    <button key={id} className={page === id ? 'active' : ''} onClick={() => go(id)} aria-current={page === id ? 'page' : undefined}>
+      <Icon name={icon} size={17} />
       <span className="grow">{text}</span>
       {!!count && <span className="count">{count}</span>}
     </button>
+  );
+
+  const pageName = page === 'ringkasan' ? 'Ringkasan' : page === 'aktivitas' ? 'Riwayat Aktivitas' : moduleById(page).menu;
+
+  const accountMenu = (
+    <Menu
+      up
+      align="left"
+      wide
+      triggerClass="account"
+      title="Akun dan pengaturan"
+      trigger={
+        <>
+          <span className="avatar">{initials(userName)}</span>
+          <span className="grow">
+            <b>{userName}</b>
+            <span className="small muted">{be.isAdmin ? 'Admin' : 'Staf'} · Unit Dokumen</span>
+          </span>
+          <ChevronsUpDown size={15} className="muted" />
+        </>
+      }
+      groups={[
+        [
+          { icon: dark ? <Sun size={16} /> : <Moon size={16} />, label: dark ? 'Tampilan terang' : 'Tampilan gelap', run: toggleTheme },
+          { icon: <Download size={16} />, label: 'Unduh cadangan data', run: () => exportJson(data) },
+          ...(!isOnline ? [{ icon: <Upload size={16} />, label: 'Pulihkan dari cadangan', run: () => fileRef.current?.click() }] : []),
+        ],
+        isOnline && be.isAdmin ? [{ icon: <Users size={16} />, label: 'Kelola peran staf', run: () => setStaffOpen(true) }] : [],
+        isOnline
+          ? [
+              { icon: <KeyRound size={16} />, label: 'Ganti kata sandi', run: changePassword },
+              { icon: <LogOut size={16} />, label: 'Keluar', run: be.signOut, danger: true },
+            ]
+          : [],
+      ]}
+    />
   );
 
   return (
     <div className={'layout' + (navOpen ? ' nav-open' : '')}>
       <aside className="sidebar">
         <div className="brand">
-          <span className="logo">DB</span>
-          <div>
-            <strong>Dokumen BYLT</strong>
-            <span className="muted small block">Balai Yasa Lahat</span>
-          </div>
-          <span className="hide-sm push">
-            <ReminderBell items={reminders} go={go} />
+          <span className="logo" aria-hidden>
+            <FileText size={16} strokeWidth={2.2} />
           </span>
+          <div className="grow">
+            <strong>Dokumen BYLT</strong>
+            <span className="brand-sub">Balai Yasa Lahat</span>
+          </div>
           <button className="icon-btn only-mobile" onClick={() => setNavOpen(false)} aria-label="Tutup menu">
             <X size={20} />
           </button>
         </div>
-
-        <button className="search-trigger" onClick={() => setPaletteOpen(true)}>
-          <Search size={16} />
-          <span className="grow">Cari apa saja…</span>
-          <kbd>Ctrl K</kbd>
-        </button>
 
         <nav>
           {navItem('ringkasan', 'ringkasan', 'Ringkasan')}
@@ -166,55 +196,16 @@ export default function App() {
         </nav>
 
         <div className="sidebar-foot">
-          {isOnline && (
-            <div className="live" title="Perubahan dari perangkat lain muncul otomatis">
-              <span className="live-dot" /> Tersinkron langsung
+          {isOnline ? (
+            <div className="sync" title="Perubahan dari perangkat lain muncul otomatis">
+              <span className="sync-dot" /> Tersinkron
+            </div>
+          ) : (
+            <div className="sync local">
+              <CloudOff size={14} /> Mode lokal, data hanya di browser ini
             </div>
           )}
-          {!isOnline && (
-            <div className="offline-note">
-              <CloudOff size={16} />
-              <span>Mode lokal: data hanya tersimpan di browser ini.</span>
-            </div>
-          )}
-          <div className="account">
-            <span className="avatar">{initials(userName)}</span>
-            <span className="grow">
-              <b>{userName}</b>
-              <span className="muted small block">
-                <span className={'role-badge ' + be.role}>{be.isAdmin ? 'Admin' : 'Staf'}</span>
-                {be.user.email && ` ${be.user.email}`}
-              </span>
-            </span>
-          </div>
-          <div className="account-actions">
-            <button className="btn ghost small" onClick={toggleTheme} title="Ganti tema">
-              {dark ? <Sun size={15} /> : <Moon size={15} />} {dark ? 'Terang' : 'Gelap'}
-            </button>
-            <button className="btn ghost small" onClick={() => exportJson(data)} title="Unduh semua data (JSON)">
-              <Download size={15} /> Unduh data
-            </button>
-            {!isOnline && (
-              <button className="btn ghost small" onClick={() => fileRef.current?.click()}>
-                <Upload size={15} /> Pulihkan
-              </button>
-            )}
-            {isOnline && be.isAdmin && (
-              <button className="btn ghost small" onClick={() => setStaffOpen(true)}>
-                <Users size={15} /> Peran staf
-              </button>
-            )}
-            {isOnline && (
-              <>
-                <button className="btn ghost small" onClick={changePassword}>
-                  <KeyRound size={15} /> Sandi
-                </button>
-                <button className="btn ghost small" onClick={be.signOut}>
-                  <LogOut size={15} /> Keluar
-                </button>
-              </>
-            )}
-          </div>
+          {accountMenu}
           <input
             ref={fileRef}
             type="file"
@@ -230,20 +221,23 @@ export default function App() {
       </aside>
 
       <div className="main">
-        <div className="topbar">
-          <button className="icon-btn" onClick={() => setNavOpen(true)} aria-label="Menu">
-            <Menu size={22} />
+        <header className="topbar">
+          <button className="icon-btn only-mobile" onClick={() => setNavOpen(true)} aria-label="Menu">
+            <Menu2 size={20} />
           </button>
-          <strong>Dokumen BYLT</strong>
+          <div className="crumbs">
+            <span className="hide-sm">Unit Dokumen</span>
+            <ChevronRight size={14} className="hide-sm muted" />
+            <b>{pageName}</b>
+          </div>
           <span className="push" />
+          <button className="search-trigger" onClick={() => setPaletteOpen(true)} aria-label="Cari">
+            <Search size={15} />
+            <span className="hide-sm">Cari dokumen, surat, resi…</span>
+            <kbd className="hide-sm">Ctrl K</kbd>
+          </button>
           <ReminderBell items={reminders} go={go} />
-          <button className="icon-btn" onClick={() => setPaletteOpen(true)} aria-label="Cari">
-            <Search size={20} />
-          </button>
-          <button className="icon-btn" onClick={toggleTheme} aria-label="Ganti tema">
-            {dark ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-        </div>
+        </header>
         {be.error && (
           <div className="toast" role="alert">
             {be.error}
@@ -255,7 +249,7 @@ export default function App() {
         <main>
           {be.loading && <div className="loading-bar" />}
           {page === 'ringkasan' ? (
-            <Overview data={data} activity={be.activity} userName={userName} loading={be.loading} go={go} />
+            <Overview data={data} activity={be.activity} loading={be.loading} go={go} />
           ) : page === 'aktivitas' ? (
             <ActivityPage activity={be.activity} go={go} />
           ) : (
@@ -289,7 +283,7 @@ export default function App() {
           );
         })}
         <button onClick={() => setNavOpen(true)}>
-          <Menu size={20} />
+          <Menu2 size={20} />
           <span>Lainnya</span>
         </button>
       </nav>

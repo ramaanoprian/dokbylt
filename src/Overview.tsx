@@ -1,18 +1,18 @@
 import { useMemo, useState } from 'react';
-import { BellRing, ChevronRight, FileSpreadsheet, Plus } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight, FileSpreadsheet, Plus } from 'lucide-react';
 import { exportRekap } from './excel';
 import { MODULES, UNITS, moduleById, type ModuleId } from './modules';
 import type { Activity, DataStore } from './backend';
 import { Icon } from './icons';
+import { Menu } from './Menu';
 import { ActivityLine } from './ActivityPage';
-import { ActivityBars, CountUp, HBars, type DayBar } from './charts';
+import { ActivityBars, HBars, type DayBar } from './charts';
 import { daysSince, dueLabel, dueTone, fmtDate, isDone, lastMove } from './util';
 import { collectReminders } from './reminders';
 
 interface Props {
   data: DataStore;
   activity: Activity[];
-  userName: string;
   loading: boolean;
   go: (id: ModuleId | 'aktivitas', openId?: string) => void;
 }
@@ -21,21 +21,28 @@ const label = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian
 const dayKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-export function Overview({ data, activity, userName, loading, go }: Props) {
+export function Overview({ data, activity, loading, go }: Props) {
   const now = new Date();
   const month = dayKey(now).slice(0, 7);
   const evp = moduleById('evp');
   const evpActive = data.evp.filter((r) => !isDone(evp, r));
-  const hour = now.getHours();
-  const greet = hour < 11 ? 'Selamat pagi' : hour < 15 ? 'Selamat siang' : hour < 18 ? 'Selamat sore' : 'Selamat malam';
-
-  const stale = MODULES.flatMap((m) =>
-    data[m.id]
-      .filter((r) => !isDone(m, r) && daysSince(lastMove(r)) >= 3)
-      .map((r) => ({ m, r, age: daysSince(lastMove(r)) })),
-  ).sort((a, b) => b.age - a.age);
+  const [rekapMonth, setRekapMonth] = useState(month);
 
   const reminders = useMemo(() => collectReminders(data), [data]);
+
+  // Satu daftar "perlu perhatian": tenggat lebih dulu, lalu pekerjaan yang tertahan 3 hari atau lebih.
+  const attention = useMemo(() => {
+    const seen = new Set(reminders.map((x) => x.r.id));
+    const stale = MODULES.flatMap((m) =>
+      data[m.id]
+        .filter((r) => !isDone(m, r) && !seen.has(r.id) && daysSince(lastMove(r)) >= 3)
+        .map((r) => ({ m, r, age: daysSince(lastMove(r)) })),
+    ).sort((a, b) => b.age - a.age);
+    return [
+      ...reminders.map(({ m, r, days }) => ({ m, r, tone: dueTone(days), note: dueLabel(days) })),
+      ...stale.map(({ m, r, age }) => ({ m, r, tone: 'stale', note: `${age} hari di tahap ini` })),
+    ];
+  }, [data, reminders]);
 
   const days: DayBar[] = useMemo(() => {
     const counts = new Map<string, number>();
@@ -67,162 +74,130 @@ export function Overview({ data, activity, userName, loading, go }: Props) {
       .sort((a, b) => b.value - a.value);
   }, [data.evp, evp, month]);
 
-  const [rekapMonth, setRekapMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const monthName = now.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
   return (
     <section className="page">
-      <header className="hero">
+      <header className="page-head">
         <div>
-          <p className="eyebrow">
+          <h1>Ringkasan</h1>
+          <p className="muted">
             {now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
           </p>
-          <h1>
-            {greet}
-            {userName ? `, ${userName.split(' ')[0]}` : ''}
-          </h1>
-          <p className="muted">
-            {reminders.length > 0
-              ? `${reminders.length} data mendekati atau melewati tenggat.`
-              : stale.length > 0
-                ? `Ada ${stale.length} pekerjaan yang tertahan 3 hari atau lebih.`
-                : 'Semua pekerjaan berjalan lancar hari ini.'}
-          </p>
+        </div>
+        <div className="head-actions">
           <div className="rekap">
-            <FileSpreadsheet size={16} className="muted" />
-            <span className="muted small">Rekap bulanan</span>
             <input
               type="month"
               value={rekapMonth}
-              max={now.toISOString().slice(0, 7)}
+              max={month}
               onChange={(e) => setRekapMonth(e.target.value)}
               aria-label="Bulan rekap"
             />
-            <button className="link" onClick={() => rekapMonth && exportRekap(data, rekapMonth)} disabled={!rekapMonth}>
-              Unduh Excel
+            <button className="btn" onClick={() => rekapMonth && exportRekap(data, rekapMonth)} disabled={!rekapMonth}>
+              <FileSpreadsheet size={16} /> <span className="hide-sm">Unduh rekap</span>
             </button>
           </div>
-        </div>
-        <div className="quick">
-          {MODULES.map((m) => (
-            <button key={m.id} className="quick-btn" onClick={() => go(m.id, 'baru')} title={`Catat ${m.itemName} baru`}>
-              <span className={`chip-icon sm c-${m.id}`}>
-                <Icon name={m.icon} size={14} />
-              </span>
-              <span>{m.menu}</span>
-              <Plus size={14} className="muted" />
-            </button>
-          ))}
+          <Menu
+            triggerClass="btn primary"
+            trigger={
+              <>
+                <Plus size={16} /> Catat baru <ChevronDown size={14} />
+              </>
+            }
+            groups={[
+              MODULES.map((m) => ({
+                icon: <Icon name={m.icon} size={16} />,
+                label: m.menu,
+                hint: m.itemName,
+                run: () => go(m.id, 'baru'),
+              })),
+            ]}
+          />
         </div>
       </header>
 
-      {reminders.length > 0 && (
-        <div className="card pad remind">
-          <div className="card-head">
-            <div className="remind-title">
-              <span className="remind-icon">
-                <BellRing size={18} />
-              </span>
-              <div>
-                <h2>Pengingat tenggat</h2>
-                <p className="muted small">Lewat tenggat atau jatuh tempo dalam 3 hari</p>
-              </div>
-            </div>
-            <span className="pill warn">{reminders.length}</span>
-          </div>
-          <ul className="remind-list">
-            {reminders.slice(0, 6).map(({ m, r, date, days }) => (
-              <li key={r.id} onClick={() => go(m.id, r.id)}>
-                <span className={`chip-icon sm c-${m.id}`}>
-                  <Icon name={m.icon} size={14} />
-                </span>
-                <span className="grow">
-                  <span className="ellipsis block">{label(r.values) || m.itemName}</span>
-                  <span className="muted small ellipsis block">
-                    {m.menu} · {r.status} · tenggat {fmtDate(date)}
-                  </span>
-                </span>
-                <span className={'due ' + dueTone(days)}>{dueLabel(days)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="stats">
-        {MODULES.map((m, idx) => {
+      <div className="kpis">
+        {MODULES.map((m) => {
           const rows = data[m.id];
           const active = rows.filter((r) => !isDone(m, r)).length;
           const thisMonth = rows.filter((r) => (r.values[m.dateField] ?? '').startsWith(month)).length;
           const late = rows.filter((r) => !isDone(m, r) && daysSince(lastMove(r)) >= 3).length;
           return (
-            <button key={m.id} className="stat" onClick={() => go(m.id)} style={{ animationDelay: `${idx * 40}ms` }}>
-              <div className="stat-top">
-                <span className={`chip-icon c-${m.id}`}>
-                  <Icon name={m.icon} />
-                </span>
-                {late > 0 && <span className="pill warn">{late} tertahan</span>}
-              </div>
-              <span className="stat-title">{m.menu}</span>
-              <span className="stat-num">{loading && !rows.length ? <span className="sk w30" /> : <CountUp value={active} />}</span>
-              <span className="muted small">berjalan · {thisMonth} bulan ini</span>
+            <button key={m.id} className="kpi" onClick={() => go(m.id)}>
+              <span className="kpi-label">
+                <Icon name={m.icon} size={15} /> {m.menu}
+              </span>
+              <span className="kpi-num">{loading && !rows.length ? <span className="sk w30" /> : active}</span>
+              <span className="kpi-sub">
+                berjalan · {thisMonth} bulan ini
+                {late > 0 && <b className="kpi-late"> · {late} tertahan</b>}
+              </span>
             </button>
           );
         })}
       </div>
 
       <div className="grid-main">
-        <div className="card pad">
-          <div className="card-head">
+        <div className="panel">
+          <div className="panel-head">
+            <div>
+              <h2>Perlu perhatian</h2>
+              <p className="muted small">Tenggat dalam 3 hari dan pekerjaan yang tertahan 3 hari atau lebih</p>
+            </div>
+            {attention.length > 0 && <span className="count-badge">{attention.length}</span>}
+          </div>
+          {attention.length === 0 ? (
+            <div className="panel-empty">
+              <CheckCircle2 size={18} className="ok" /> Tidak ada tenggat atau pekerjaan yang tertahan.
+            </div>
+          ) : (
+            <ul className="list">
+              {attention.slice(0, 7).map(({ m, r, tone, note }) => (
+                <li key={r.id} className="clickable" onClick={() => go(m.id, r.id)}>
+                  <span className="grow">
+                    <span className="ellipsis block list-title">{label(r.values) || m.itemName}</span>
+                    <span className="muted small ellipsis block">
+                      {m.menu} · {r.status}
+                    </span>
+                  </span>
+                  <span className={'due ' + tone}>{note}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {attention.length > 7 && <p className="panel-more muted small">dan {attention.length - 7} lainnya</p>}
+        </div>
+
+        <div className="panel">
+          <div className="panel-head">
             <div>
               <h2>Aktivitas 14 hari terakhir</h2>
-              <p className="muted small">Jumlah pencatatan, perubahan, dan perpindahan tahap per hari</p>
+              <p className="muted small">Pencatatan, perubahan, dan perpindahan tahap per hari</p>
             </div>
             <button className="link" onClick={() => go('aktivitas')}>
               Riwayat <ChevronRight size={14} />
             </button>
           </div>
-          <ActivityBars data={days} />
-        </div>
-
-        <div className="card pad">
-          <div className="card-head">
-            <h2>Perlu ditindaklanjuti</h2>
-            {stale.length > 0 && <span className="pill warn">{stale.length}</span>}
+          <div className="panel-body">
+            <ActivityBars data={days} />
           </div>
-          {stale.length === 0 ? (
-            <div className="all-good">
-              <span className="big-check">✓</span>
-              <p className="muted small">Tidak ada pekerjaan yang tertahan 3 hari atau lebih.</p>
-            </div>
-          ) : (
-            <ul className="rows">
-              {stale.slice(0, 5).map(({ m, r, age }) => (
-                <li key={r.id} className="clickable" onClick={() => go(m.id, r.id)}>
-                  <span className={`chip-icon sm c-${m.id}`}>
-                    <Icon name={m.icon} size={14} />
-                  </span>
-                  <span className="grow">
-                    <span className="ellipsis block">{label(r.values) || m.itemName}</span>
-                    <span className="muted small block">{r.status}</span>
-                  </span>
-                  <span className="age">{age} hari</span>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       </div>
 
       <div className="grid-2">
-        <div className="card pad">
-          <div className="card-head">
-            <h2>TTD EVP per unit</h2>
+        <div className="panel">
+          <div className="panel-head">
+            <div>
+              <h2>TTD EVP per unit</h2>
+              <p className="muted small">Dokumen yang belum kembali ke unit</p>
+            </div>
             <button className="link" onClick={() => go('evp')}>
               Buka <ChevronRight size={14} />
             </button>
           </div>
           {evpActive.length === 0 ? (
-            <p className="muted small">Tidak ada dokumen yang sedang menunggu.</p>
+            <div className="panel-empty">Tidak ada dokumen yang sedang menunggu.</div>
           ) : (
             <div className="table-wrap">
               <table className="mini">
@@ -230,7 +205,9 @@ export function Overview({ data, activity, userName, loading, go }: Props) {
                   <tr>
                     <th>Unit</th>
                     {evp.statuses.slice(0, -1).map((s) => (
-                      <th key={s}>{s}</th>
+                      <th key={s} className="num">
+                        {s}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -243,7 +220,11 @@ export function Overview({ data, activity, userName, loading, go }: Props) {
                         <td>{u}</td>
                         {evp.statuses.slice(0, -1).map((s) => {
                           const n = rows.filter((r) => r.status === s).length;
-                          return <td key={s}>{n ? <span className="num-chip">{n}</span> : <span className="muted">–</span>}</td>;
+                          return (
+                            <td key={s} className="num">
+                              {n || <span className="muted">–</span>}
+                            </td>
+                          );
                         })}
                       </tr>
                     );
@@ -254,32 +235,34 @@ export function Overview({ data, activity, userName, loading, go }: Props) {
           )}
         </div>
 
-        <div className="card pad">
-          <div className="card-head">
+        <div className="panel">
+          <div className="panel-head">
             <div>
-              <h2>Dokumen TTD EVP bulan ini</h2>
-              <p className="muted small">Per jenis dokumen</p>
+              <h2>Jenis dokumen TTD EVP</h2>
+              <p className="muted small">Masuk pada {monthName}</p>
             </div>
           </div>
           {byJenis.length === 0 ? (
-            <p className="muted small">Belum ada dokumen bulan ini.</p>
+            <div className="panel-empty">Belum ada dokumen bulan ini.</div>
           ) : (
-            <HBars data={byJenis} />
+            <div className="panel-body">
+              <HBars data={byJenis} />
+            </div>
           )}
         </div>
       </div>
 
-      <div className="card pad">
-        <div className="card-head">
+      <div className="panel">
+        <div className="panel-head">
           <h2>Aktivitas terakhir</h2>
           <button className="link" onClick={() => go('aktivitas')}>
             Semua riwayat <ChevronRight size={14} />
           </button>
         </div>
         {activity.length === 0 ? (
-          <p className="muted small">Belum ada aktivitas. Mulai dengan mencatat dokumen di salah satu menu.</p>
+          <div className="panel-empty">Belum ada aktivitas.</div>
         ) : (
-          <ul className="rows">
+          <ul className="list">
             {activity.slice(0, 6).map((a) => (
               <ActivityLine key={a.id} a={a} onOpen={a.recordId ? () => go(a.module, a.recordId) : undefined} />
             ))}
