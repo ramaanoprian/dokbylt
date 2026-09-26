@@ -3,11 +3,12 @@
 // FONNTE_TOKEN di Supabase, tidak pernah sampai ke browser.
 //
 // Fungsi ini hanya mengirim ke nomor yang tercatat di data itu sendiri, dan hanya
-// bila datanya memang sedang di tahap "Ditandatangani EVP", jadi tidak bisa dipakai
+// bila datanya memang sudah di tahap "Ditandatangani EVP" atau sesudahnya, jadi tidak bisa dipakai
 // untuk mengirim pesan bebas.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const NOTIFY: Record<string, string> = { evp: 'Ditandatangani EVP' };
+// Tahap pemicu dan tahap-tahap sesudahnya (staf kadang langsung melompat ke tahap akhir).
+const NOTIFY: Record<string, string[]> = { evp: ['Ditandatangani EVP', 'Didistribusikan ke unit'] };
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -57,7 +58,7 @@ Deno.serve(async (req) => {
   if (!id) return json({ error: 'id kosong' }, 400);
   const { data: rec, error } = await db.from('records').select('module, status, values').eq('id', id).single();
   if (error || !rec) return json({ error: 'Data tidak ditemukan' }, 404);
-  if (NOTIFY[rec.module] !== rec.status) return json({ error: 'Data belum di tahap yang perlu dikabari' }, 409);
+  if (!NOTIFY[rec.module]?.includes(rec.status)) return json({ error: 'Data belum di tahap yang perlu dikabari' }, 409);
 
   const values = (rec.values ?? {}) as Record<string, string>;
   const target = waNumber(values.kontakPic);
