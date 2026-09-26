@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, MessageCircle, Printer, X } from 'lucide-react';
-import { OTHER, otherKey, type ModuleDef } from './modules';
+import { OTHER, firstStatus, otherKey, type ModuleDef } from './modules';
 import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
 import { daysUntil, defaultDue, notifyUrl, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
 import { Icon } from './icons';
@@ -35,7 +35,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
   });
   // Tenggat mengikuti tanggal utama sampai diubah sendiri oleh pengguna.
   const [dueAuto, setDueAuto] = useState(() => !record || (!record.values.tenggat && !!mod.dueDays));
-  const [status, setStatus] = useState(targetStatus ?? record?.status ?? mod.statuses[0]);
+  const [status, setStatus] = useState(targetStatus ?? record?.status ?? firstStatus(mod));
 
   const needed = new Set([
     ...mod.fields.filter((f) => f.required).map((f) => f.key),
@@ -268,7 +268,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
                 <b>Kabari PIC unit</b>
                 <span className="muted small block">
                   {!waNumber(values.kontakPic)
-                    ? 'Isi No. WA PIC unit agar PIC dikabari otomatis saat dokumen sudah ditandatangani EVP.'
+                    ? 'Isi No. WA PIC unit agar PIC dikabari otomatis saat dokumen diterima dan saat sudah ditandatangani EVP.'
                     : mod.statuses.indexOf(status) < mod.statuses.indexOf(mod.notifyStatus)
                       ? `WA terkirim otomatis ke ${values.pic || 'PIC'} saat tahap jadi “${mod.notifyStatus}”.`
                       : `Kirim ulang kabar ke ${values.pic || 'PIC'} lewat WhatsApp Anda bila perlu.`}

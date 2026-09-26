@@ -1,6 +1,7 @@
-// Antrean WA ke PIC unit. Dokumen yang sampai di tahap "Ditandatangani EVP" tidak langsung
-// dikabari: ditunggu sebentar supaya dokumen lain milik PIC yang sama (nomor WA sama) ikut
-// dalam satu pesan. Setiap dokumen baru memulai hitungan ulang.
+// Antrean WA ke PIC unit. Dokumen yang sampai di tahap yang dikabari ("Diterima dari unit",
+// "Ditandatangani EVP") tidak langsung dikirim: ditunggu sebentar supaya dokumen lain milik
+// PIC yang sama (nomor WA sama, tahap sama) ikut dalam satu pesan. Setiap dokumen baru
+// memulai hitungan ulang.
 import { useSyncExternalStore } from 'react';
 import { sendNotify, type DocRecord, type NotifyResult } from './backend';
 import { waNumber } from './util';
@@ -8,7 +9,10 @@ import { waNumber } from './util';
 export const NOTIFY_WAIT_MS = 60_000;
 
 export interface Batch {
+  /** Nomor WA dan tahap, mis. "6281234567890|Ditandatangani EVP". */
+  key: string;
   target: string;
+  stage: string;
   pic: string;
   docs: { id: string; values: Record<string, string> }[];
   sendAt: number;
@@ -24,62 +28,60 @@ const resultListeners = new Set<ResultListener>();
 
 const emit = () => listeners.forEach((l) => l());
 
-function schedule(target: string) {
-  clearTimeout(timers.get(target));
+function schedule(key: string) {
+  clearTimeout(timers.get(key));
   timers.set(
-    target,
-    setTimeout(() => void flush(target), NOTIFY_WAIT_MS),
+    key,
+    setTimeout(() => void flush(key), NOTIFY_WAIT_MS),
   );
 }
 
-/** Masukkan dokumen ke antrean PIC-nya (atau perbarui isinya bila sudah ada). */
-export function queueNotify(rec: DocRecord) {
+/** Masukkan dokumen ke antrean PIC-nya untuk tahap itu (atau perbarui isinya bila sudah ada). */
+export function queueNotify(rec: DocRecord, stage: string) {
   const target = waNumber(rec.values.kontakPic);
   if (!target) return;
-  cancelNotify(rec.id, false);
+  const key = `${target}|${stage}`;
+  cancelNotify(rec.id, (s) => s === stage, false);
   const doc = { id: rec.id, values: rec.values };
-  const found = batches.find((b) => b.target === target);
+  const found = batches.find((b) => b.key === key);
   const sendAt = Date.now() + NOTIFY_WAIT_MS;
   batches = found
-    ? batches.map((b) =>
-        b === found
-          ? {
-              ...b,
-              pic: rec.values.pic || b.pic,
-              docs: [...b.docs, doc],
-              sendAt,
-            }
-          : b,
-      )
-    : [...batches, { target, pic: rec.values.pic || 'PIC unit', docs: [doc], sendAt }];
-  schedule(target);
+    ? batches.map((b) => (b === found ? { ...b, pic: rec.values.pic || b.pic, docs: [...b.docs, doc], sendAt } : b))
+    : [...batches, { key, target, stage, pic: rec.values.pic || 'PIC unit', docs: [doc], sendAt }];
+  schedule(key);
   emit();
 }
 
-/** Keluarkan dokumen dari antrean, mis. karena tahapnya diurungkan. */
-export function cancelNotify(id: string, notify = true) {
-  const before = batches;
+/**
+ * Keluarkan dokumen dari antrean, mis. karena tahapnya diurungkan. `which` memilih tahap
+ * antrean mana yang dibuang; tanpa `which` dokumen dibuang dari semua antrean.
+ */
+export function cancelNotify(id: string, which: (stage: string) => boolean = () => true, notify = true) {
+  if (!batches.some((b) => which(b.stage) && b.docs.some((d) => d.id === id))) return;
   batches = batches
-    .map((b) => (b.docs.some((d) => d.id === id) ? { ...b, docs: b.docs.filter((d) => d.id !== id) } : b))
+    .map((b) =>
+      which(b.stage) && b.docs.some((d) => d.id === id) ? { ...b, docs: b.docs.filter((d) => d.id !== id) } : b,
+    )
     .filter((b) => {
       if (b.docs.length) return true;
-      clearTimeout(timers.get(b.target));
-      timers.delete(b.target);
+      clearTimeout(timers.get(b.key));
+      timers.delete(b.key);
       return false;
     });
-  if (notify && before !== batches) emit();
+  if (notify) emit();
 }
 
-/** Kirim antrean satu PIC sekarang juga. */
-export async function flush(target: string, keepalive = false) {
-  const b = batches.find((x) => x.target === target);
-  clearTimeout(timers.get(target));
-  timers.delete(target);
+/** Kirim satu antrean sekarang juga. */
+export async function flush(key: string, keepalive = false) {
+  const b = batches.find((x) => x.key === key);
+  clearTimeout(timers.get(key));
+  timers.delete(key);
   if (!b) return;
   batches = batches.filter((x) => x !== b);
   emit();
   const r = await sendNotify(
     b.docs.map((d) => d.id),
+    b.stage,
     keepalive,
   );
   resultListeners.forEach((l) => l(b, r));
@@ -87,7 +89,7 @@ export async function flush(target: string, keepalive = false) {
 
 // Saat halaman ditutup atau aplikasi di HP dipindah ke latar belakang, kirim semua antrean.
 if (typeof window !== 'undefined') {
-  const flushAll = () => batches.map((b) => b.target).forEach((t) => void flush(t, true));
+  const flushAll = () => batches.map((b) => b.key).forEach((k) => void flush(k, true));
   addEventListener('pagehide', flushAll);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushAll();

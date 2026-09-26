@@ -1,14 +1,20 @@
-// Mengirim WA otomatis ke PIC unit saat dokumen TTD EVP sudah ditandatangani.
+// Mengirim WA otomatis ke PIC unit saat dokumen TTD EVP diterima dan saat sudah ditandatangani.
 // Pesan dikirim lewat Fonnte (https://fonnte.com). Token disimpan sebagai secret
 // FONNTE_TOKEN di Supabase, tidak pernah sampai ke browser.
 //
-// Fungsi ini hanya mengirim ke nomor yang tercatat di data itu sendiri, dan hanya
-// bila datanya memang sudah di tahap "Ditandatangani EVP" atau sesudahnya, jadi tidak bisa dipakai
-// untuk mengirim pesan bebas.
+// Fungsi ini hanya mengirim ke nomor yang tercatat di data itu sendiri, dan hanya bila
+// datanya memang sudah sampai di tahap yang dikabarkan, jadi tidak bisa dipakai untuk
+// mengirim pesan bebas.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-// Tahap pemicu dan tahap-tahap sesudahnya (staf kadang langsung melompat ke tahap akhir).
-const NOTIFY: Record<string, string[]> = { evp: ['Ditandatangani EVP', 'Didistribusikan ke unit'] };
+// Urutan tahap dan tahap yang dikabari. Data dianggap sudah melewati sebuah tahap bila
+// tahapnya sekarang sama atau sesudahnya (staf kadang melompat langsung ke tahap akhir).
+const STATUSES: Record<string, string[]> = {
+  evp: ['Didaftarkan unit', 'Diterima dari unit', 'Diserahkan ke EVP', 'Ditandatangani EVP', 'Didistribusikan ke unit'],
+};
+const STAGES: Record<string, string[]> = { evp: ['Diterima dari unit', 'Ditandatangani EVP'] };
+const RECEIVED = 'Diterima dari unit';
+const SIGNED = 'Ditandatangani EVP';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -32,19 +38,23 @@ function docLine(v: Record<string, string>) {
 }
 
 // Sama dengan signedMessage di src/util.ts.
-function message(docs: Record<string, string>[], sender: string) {
+function message(docs: Record<string, string>[], sender: string, stage: string) {
   const v = docs[0] ?? {};
   const unit = v.unit ? ` dari unit ${v.unit}` : '';
+  const received = stage === RECEIVED;
+  const what = received ? 'sudah kami terima dan akan kami teruskan ke EVP untuk ditandatangani' : 'sudah ditandatangani EVP';
   const body =
     docs.length > 1
-      ? [`${docs.length} dokumen berikut${unit} sudah ditandatangani EVP:`, ...docs.map((d, i) => `${i + 1}. ${docLine(d)}`)]
-      : [`${docLine(v) === 'Dokumen' ? 'Dokumen' : `Dokumen ${docLine(v)}`}${unit} sudah ditandatangani EVP.`];
+      ? [`${docs.length} dokumen berikut${unit} ${what}:`, ...docs.map((d, i) => `${i + 1}. ${docLine(d)}`)]
+      : [`${docLine(v) === 'Dokumen' ? 'Dokumen' : `Dokumen ${docLine(v)}`}${unit} ${what}.`];
   return [
     `Halo ${v.pic || 'Bapak/Ibu'},`,
     '',
     ...body,
     '',
-    'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
+    received
+      ? 'Kami akan mengabari lagi setelah dokumen ditandatangani.'
+      : 'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
     '',
     'Terima kasih,',
     ...(sender ? [sender] : []),
@@ -73,13 +83,15 @@ Deno.serve(async (req) => {
     .filter((x: unknown) => typeof x === 'string')
     .slice(0, 50);
   if (!ids.length) return json({ error: 'id kosong' }, 400);
+  const stage = typeof input.stage === 'string' ? input.stage : SIGNED;
   const { data: recs, error } = await db.from('records').select('id, module, status, values').in('id', ids);
   if (error || !recs?.length) return json({ error: 'Data tidak ditemukan' }, 404);
 
   const groups = new Map<string, Record<string, string>[]>();
   recs.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
   for (const rec of recs) {
-    if (!NOTIFY[rec.module]?.includes(rec.status)) continue;
+    const order = STATUSES[rec.module];
+    if (!order || !STAGES[rec.module].includes(stage) || order.indexOf(rec.status) < order.indexOf(stage)) continue;
     const values = (rec.values ?? {}) as Record<string, string>;
     const target = waNumber(values.kontakPic);
     if (target) groups.set(target, [...(groups.get(target) ?? []), values]);
@@ -93,7 +105,7 @@ Deno.serve(async (req) => {
   for (const [target, docs] of groups) {
     const body = new FormData();
     body.set('target', target);
-    body.set('message', message(docs, sender));
+    body.set('message', message(docs, sender, stage));
     body.set('countryCode', '62');
     const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: token }, body });
     const out = await res.json().catch(() => ({}));

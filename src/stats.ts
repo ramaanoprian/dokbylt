@@ -2,10 +2,15 @@ import type { ModuleDef } from './modules';
 import type { DocRecord } from './backend';
 import { daysSince, daysUntil, deadlineOf, isDone, lastMove } from './util';
 
-/** Kelas warna tahap: s0, s1, s2 untuk tahap berjalan, "done" untuk tahap terakhir. */
+/**
+ * Kelas warna tahap: s0, s1, s2 untuk tahap berjalan, "done" untuk tahap terakhir, dan "pre"
+ * (abu-abu) untuk tahap awal yang belum diproses, mis. dokumen yang baru didaftarkan unit lewat QR.
+ */
 export const stageClass = (mod: ModuleDef, status: string) => {
+  if (mod.preStatus && status === mod.preStatus) return 'pre';
   const i = mod.statuses.indexOf(status);
-  return i === mod.statuses.length - 1 ? 'done' : `s${Math.max(0, i)}`;
+  if (i === mod.statuses.length - 1) return 'done';
+  return `s${Math.max(0, i - (mod.preStatus ? 1 : 0))}`;
 };
 
 /** Hari dari dicatat sampai tahap terakhir, atau undefined bila belum selesai. */

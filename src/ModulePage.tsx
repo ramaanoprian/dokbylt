@@ -4,7 +4,7 @@ import type { ModuleDef } from './modules';
 import { attachmentsOf, sendDroneNotify, type DocRecord, type NotifyKind } from './backend';
 import { cancelNotify, queueNotify } from './notifyQueue';
 import { DataMenu } from './DataMenu';
-import { DroneQrButton } from './DroneQr';
+import { FormQrButton, QR_FORMS } from './FormQr';
 import { Hero, LocalNav } from './LocalNav';
 import type { FileApi } from './Attachments';
 import { Icon } from './icons';
@@ -126,15 +126,16 @@ export function ModulePage({
   // WA ke PIC tidak langsung dikirim: masuk antrean agar beberapa dokumen digabung jadi satu pesan.
   const saveAndNotify = (r: DocRecord, prev?: DocRecord) =>
     Promise.resolve(onSave(r, prev)).then(async (notify) => {
-      if (notify === 'batch') queueNotify(r);
+      if (notify && typeof notify === 'object') queueNotify(r, notify.stage);
       else if (notify === 'instant') {
         const who = r.values.pic || 'peminjam';
         const res = await sendDroneNotify(r.id);
         if (res.sent) toast(`WA terkirim ke ${who}`);
         else toast(`WA ke ${who} belum terkirim (${res.reason})`);
       }
-      else if (mod.notifyStatus && mod.statuses.indexOf(r.status) < mod.statuses.indexOf(mod.notifyStatus))
-        cancelNotify(r.id);
+      // Dipindah mundur: buang WA yang masih antre untuk tahap yang belum dicapai lagi.
+      const now = mod.statuses.indexOf(r.status);
+      cancelNotify(r.id, (stage) => mod.statuses.indexOf(stage) > now);
     });
 
   const moveTo = (r: DocRecord, next: string) => {
@@ -204,7 +205,7 @@ export function ModulePage({
   return (
     <>
       <LocalNav title={mod.menu} icon={mod.icon} mod={mod.id}>
-        {mod.id === 'drone' && <DroneQrButton />}
+        {QR_FORMS[mod.id] && <FormQrButton form={QR_FORMS[mod.id]!} />}
         <DataMenu
           mod={mod}
           rows={view === 'papan' ? searched : filtered}

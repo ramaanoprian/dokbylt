@@ -33,6 +33,7 @@
   --card-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.05), 0 2px 6px rgba(0, 0, 0, 0.04), 0 12px 32px -8px rgba(0, 0, 0, 0.1);
   --card-shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 16px rgba(0, 0, 0, 0.06), 0 28px 56px -12px rgba(0, 0, 0, 0.2);
   /* Warna tahap (sudah dicek aman untuk buta warna): awal, tengah, akhir, selesai. */
+  --s-pre: #aeaeb2;
   --s0: #e8890c;
   --s1: #5e5ce6;
   --s2: #30b0c7;
@@ -75,6 +76,7 @@
   --scrim: rgba(0, 0, 0, 0.6);
   --card-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
   --card-shadow-hover: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 24px 56px -12px rgba(0, 0, 0, 0.8);
+  --s-pre: #636366;
   --s0: #d07a08;
   --s1: #7d7aff;
   --s2: #29a0b7;
@@ -331,6 +333,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .stagebar-legend li.zero b { font-weight: 400; }
 .stagebar-legend b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--muted); }
+.seg.pre, .dot.pre, .steps i.pre { background: var(--s-pre); }
 .seg.s0, .dot.s0, .steps i.s0 { background: var(--s0); }
 .seg.s1, .dot.s1, .steps i.s1 { background: var(--s1); }
 .seg.s2, .dot.s2, .steps i.s2 { background: var(--s2); }
@@ -422,6 +425,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .pill.new::before { background: var(--dot-new); }
 .pill.mid::before { background: var(--dot-mid); }
 .pill.done::before { background: var(--s-done); }
+.pill.pre::before { background: var(--s-pre); }
 .pill.s0::before { background: var(--s0); }
 .pill.s1::before { background: var(--s1); }
 .pill.s2::before { background: var(--s2); }
@@ -576,6 +580,7 @@ tr:hover td.actions .btn, td.actions .btn:focus-visible { opacity: 1; }
 .col-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dot-mid); }
 .col-dot.new { background: var(--dot-new); }
 .col-dot.done { background: var(--s-done); }
+.col-dot.pre { background: var(--s-pre); }
 .col-dot.s0 { background: var(--s0); }
 .col-dot.s1 { background: var(--s1); }
 .col-dot.s2 { background: var(--s2); }
@@ -616,7 +621,7 @@ tr:hover td.actions .btn, td.actions .btn:focus-visible { opacity: 1; }
 .stepper { border: 0; padding: 0; margin: 0 0 26px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0; }
 .stepper legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .stepper label { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 4px 4px 0; cursor: pointer; text-align: center; font-size: 0.8rem; line-height: 1.25; color: var(--muted); --c: var(--s-done); }
-.stepper label.s0 { --c: var(--s0); } .stepper label.s1 { --c: var(--s1); } .stepper label.s2 { --c: var(--s2); }
+.stepper label.pre { --c: var(--s-pre); } .stepper label.s0 { --c: var(--s0); } .stepper label.s1 { --c: var(--s1); } .stepper label.s2 { --c: var(--s2); }
 /* Garis penghubung antartahap */
 .stepper label + label::before { content: ''; position: absolute; top: 18px; right: calc(50% + 18px); left: calc(-50% + 18px); height: 2px; border-radius: 1px; background: var(--fill); }
 .stepper label.past + label::before, .stepper label.past + label.on::before { background: var(--s-done); }
@@ -884,3 +889,17 @@ tr:hover td.actions .btn, td.actions .btn:focus-visible { opacity: 1; }
 .qr-body img, .qr-ph { width: min(300px, 100%); aspect-ratio: 1; border-radius: 16px; background: #fff; padding: 12px; box-shadow: inset 0 0 0 1px var(--hair); }
 .qr-body code { font-size: 0.8rem; color: var(--muted); word-break: break-all; text-align: center; }
 .qr-sheet .sheet-head p { margin-top: 6px; }
+.berkas { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.berkas-title { font-size: 0.875rem; font-weight: 500; color: var(--text-2); }
+.berkas-item { width: 100%; display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-radius: 16px; background: var(--fill-2); }
+.berkas-num { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 0.8rem; font-weight: 600; color: #fff; background: var(--accent); margin-top: 28px; }
+.berkas-fields { flex: 1; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
+.berkas-fields label { display: flex; flex-direction: column; gap: 8px; font-size: 0.875rem; font-weight: 500; color: var(--text-2); }
+.berkas-fields label.full { grid-column: 1 / -1; }
+.berkas-fields input, .berkas-fields select { background: var(--surface); }
+.berkas-item .icon-btn { margin-top: 24px; color: var(--muted); }
+.doc-list { margin: 4px 0; padding-left: 22px; display: grid; gap: 8px; }
+@media (max-width: 640px) {
+  .berkas-fields { grid-template-columns: 1fr; }
+  .berkas-item { padding: 14px 12px; gap: 10px; }
+}
