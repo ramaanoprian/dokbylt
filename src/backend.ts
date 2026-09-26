@@ -32,13 +32,44 @@ export interface Activity {
   detail?: string;
 }
 
+export type Role = 'admin' | 'staf';
+
 export interface AppUser {
   id: string;
   email: string;
   name: string;
 }
 
-const EMPTY: DataStore = { evp: [], surat: [], pos: [], multimedia: [], arsip: [] };
+export interface StaffMember {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  lastSignIn?: string;
+}
+
+/** Berkas lampiran (foto/scan) yang disimpan di values.lampiran sebagai JSON. */
+export interface Attachment {
+  path: string;
+  name: string;
+  type: string;
+  size: number;
+  at: string;
+  by?: string;
+}
+
+const BUCKET = 'lampiran';
+
+export function attachmentsOf(values: Record<string, string>): Attachment[] {
+  try {
+    const list = JSON.parse(values.lampiran || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+const EMPTY: DataStore = { evp: [], surat: [], keluar: [], pos: [], multimedia: [], arsip: [] };
 const ACTIVITY_LIMIT = 500;
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -110,7 +141,7 @@ const toUser = (s: Session | null): AppUser | null =>
     : null;
 
 function groupRows(rows: RecordRow[]): DataStore {
-  const out: DataStore = { evp: [], surat: [], pos: [], multimedia: [], arsip: [] };
+  const out: DataStore = { evp: [], surat: [], keluar: [], pos: [], multimedia: [], arsip: [] };
   for (const r of rows) if (out[r.module]) out[r.module].push(fromRow(r));
   return out;
 }
@@ -163,6 +194,7 @@ export function useBackend() {
   );
   const [loading, setLoading] = useState(!!supabase);
   const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState<Role>(supabase ? 'staf' : 'admin');
 
   const user = useMemo(() => (supabase ? toUser(session) : LOCAL_USER), [session]);
 
@@ -211,6 +243,8 @@ export function useBackend() {
   const userId = user?.id;
   useEffect(() => {
     if (!supabase || !userId) return;
+    // Peran dibaca dari server; aturan hapus di database tetap memeriksanya sendiri.
+    supabase.rpc('is_admin').then(({ data: admin }) => setRole(admin ? 'admin' : 'staf'));
     loadAll();
     const channel = supabase
       .channel('dokbylt')
@@ -305,6 +339,87 @@ export function useBackend() {
     [loadAll],
   );
 
+  /** Menyimpan banyak data baru sekaligus (impor Excel). */
+  const saveMany = useCallback(
+    async (mod: ModuleId, recs: DocRecord[]) => {
+      setData((d) => ({ ...d, [mod]: [...recs, ...d[mod]] }));
+      if (!supabase) {
+        for (const r of recs) logLocal(mod, 'tambah', r, 'impor Excel');
+        return null;
+      }
+      for (let i = 0; i < recs.length; i += 200) {
+        const chunk = recs.slice(i, i + 200).map((r) => ({
+          id: r.id,
+          module: mod,
+          status: r.status,
+          values: r.values,
+          history: r.history,
+          created_at: r.createdAt,
+          updated_at: r.updatedAt,
+        }));
+        const { error: e } = await supabase.from('records').insert(chunk);
+        if (e) {
+          setError('Gagal mengimpor: ' + e.message);
+          loadAll();
+          return e.message;
+        }
+      }
+      return null;
+    },
+    [loadAll],
+  );
+
+  // ---------- Lampiran ----------
+
+  const uploadFile = useCallback(async (path: string, file: Blob): Promise<string | null> => {
+    if (!supabase) {
+      // Mode lokal: simpan sebagai data URL di browser.
+      return await new Promise((res) => {
+        const fr = new FileReader();
+        fr.onload = () => res(String(fr.result));
+        fr.onerror = () => res(null);
+        fr.readAsDataURL(file);
+      });
+    }
+    const { error: e } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+    if (e) {
+      setError('Gagal mengunggah: ' + e.message);
+      return null;
+    }
+    return path;
+  }, []);
+
+  const fileUrl = useCallback(async (path: string) => {
+    if (!supabase || path.startsWith('data:')) return path;
+    const { data: d } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+    return d?.signedUrl ?? null;
+  }, []);
+
+  const removeFile = useCallback(async (path: string) => {
+    if (!supabase || path.startsWith('data:')) return;
+    await supabase.storage.from(BUCKET).remove([path]);
+  }, []);
+
+  // ---------- Peran staf ----------
+
+  const listStaff = useCallback(async (): Promise<StaffMember[]> => {
+    if (!supabase) return [{ id: LOCAL_USER.id, email: '', name: LOCAL_USER.name, role: 'admin' }];
+    const { data: rows, error: e } = await supabase.rpc('list_staff');
+    if (e) {
+      setError('Gagal memuat daftar staf: ' + e.message);
+      return [];
+    }
+    return (rows as { id: string; email: string; name: string; role: Role; last_sign_in_at: string | null }[]).map(
+      (r) => ({ id: r.id, email: r.email, name: r.name, role: r.role, lastSignIn: r.last_sign_in_at ?? undefined }),
+    );
+  }, []);
+
+  const setStaffRole = useCallback(async (id: string, next: Role) => {
+    if (!supabase) return null;
+    const { error: e } = await supabase.rpc('set_staff_role', { target: id, new_role: next });
+    return e ? e.message : null;
+  }, []);
+
   const replaceAll = useCallback((next: DataStore) => {
     if (supabase) return;
     setData({ ...EMPTY, ...next });
@@ -343,13 +458,21 @@ export function useBackend() {
   return {
     authReady,
     user,
+    role,
+    isAdmin: role === 'admin',
     data,
     activity,
     loading,
     error,
     clearError: () => setError(null),
     save,
+    saveMany,
     remove,
+    uploadFile,
+    fileUrl,
+    removeFile,
+    listStaff,
+    setStaffRole,
     replaceAll,
     signIn,
     signOut,

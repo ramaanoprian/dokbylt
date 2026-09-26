@@ -101,3 +101,29 @@ export function dueLabel(days: number) {
 }
 
 export const dueTone = (days: number) => (days < 0 ? 'over' : days <= 1 ? 'soon' : days <= REMIND_DAYS ? 'near' : 'far');
+
+// ---------- WhatsApp ----------
+
+/** Nomor WA dalam format internasional (62…) dari isian bebas; kosong bila bukan nomor. */
+export function waNumber(kontak = '') {
+  const m = kontak.match(/(\+?62|0)8[\d\s.-]{7,14}/);
+  if (!m) return '';
+  const digits = m[0].replace(/\D/g, '');
+  return digits.startsWith('0') ? '62' + digits.slice(1) : digits;
+}
+
+export const emailOf = (kontak = '') => kontak.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)?.[0] ?? '';
+
+export function resiMessage(v: Record<string, string>) {
+  return [
+    `Halo ${v.pengirim || 'Bapak/Ibu'},`,
+    '',
+    `Kiriman${v.isi ? ` "${v.isi}"` : ''} untuk ${v.tujuan || 'tujuan'} sudah dikirim lewat Kantor Pos.`,
+    `Nomor resi: *${v.resi}*`,
+    '',
+    'Status pengiriman bisa dicek di https://www.posindonesia.co.id/id/tracking',
+    '',
+    'Terima kasih,',
+    'Unit Dokumen Balai Yasa Lahat',
+  ].join('\n');
+}

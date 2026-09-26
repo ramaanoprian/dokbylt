@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
-import { BellRing, ChevronRight, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { BellRing, ChevronRight, FileSpreadsheet, Plus } from 'lucide-react';
+import { exportRekap } from './excel';
 import { MODULES, UNITS, moduleById, type ModuleId } from './modules';
 import type { Activity, DataStore } from './backend';
 import { Icon } from './icons';
@@ -66,6 +67,8 @@ export function Overview({ data, activity, userName, loading, go }: Props) {
       .sort((a, b) => b.value - a.value);
   }, [data.evp, evp, month]);
 
+  const [rekapMonth, setRekapMonth] = useState(() => new Date().toISOString().slice(0, 7));
+
   return (
     <section className="page">
       <header className="hero">
@@ -84,6 +87,20 @@ export function Overview({ data, activity, userName, loading, go }: Props) {
                 ? `Ada ${stale.length} pekerjaan yang tertahan 3 hari atau lebih.`
                 : 'Semua pekerjaan berjalan lancar hari ini.'}
           </p>
+          <div className="rekap">
+            <FileSpreadsheet size={16} className="muted" />
+            <span className="muted small">Rekap bulanan</span>
+            <input
+              type="month"
+              value={rekapMonth}
+              max={now.toISOString().slice(0, 7)}
+              onChange={(e) => setRekapMonth(e.target.value)}
+              aria-label="Bulan rekap"
+            />
+            <button className="link" onClick={() => rekapMonth && exportRekap(data, rekapMonth)} disabled={!rekapMonth}>
+              Unduh Excel
+            </button>
+          </div>
         </div>
         <div className="quick">
           {MODULES.map((m) => (

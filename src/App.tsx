@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CloudOff, Download, KeyRound, LogOut, Menu, Moon, Search, Sun, Upload, X } from 'lucide-react';
+import { CloudOff, Download, KeyRound, LogOut, Menu, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
 import { MODULES, moduleById, type ModuleId } from './modules';
 import { isOnline, useBackend, type DataStore } from './backend';
 import { Icon } from './icons';
@@ -9,6 +9,7 @@ import { ActivityPage, initials } from './ActivityPage';
 import { LoginPage, NamePrompt } from './LoginPage';
 import { CommandPalette } from './CommandPalette';
 import { ReminderBell } from './ReminderBell';
+import { StaffDialog } from './StaffDialog';
 import { collectReminders } from './reminders';
 import { useToast } from './toast';
 import { exportJson, isDone, readPref, writePref } from './util';
@@ -24,6 +25,7 @@ export default function App() {
   const be = useBackend();
   const [page, setPage] = useState<Page>(readHash);
   const [navOpen, setNavOpen] = useState(false);
+  const [staffOpen, setStaffOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [openId, setOpenId] = useState<string | undefined>();
   const [dark, setDark] = useState(() => {
@@ -75,6 +77,9 @@ export default function App() {
     scrollTo(0, 0);
   }, []);
   const clearOpen = useCallback(() => setOpenId(undefined), []);
+  const closeStaff = useCallback(() => setStaffOpen(false), []);
+  const { uploadFile, fileUrl, removeFile } = be;
+  const files = useMemo(() => ({ upload: uploadFile, url: fileUrl, remove: removeFile }), [uploadFile, fileUrl, removeFile]);
 
   // Sekali per sesi browser: beri tahu bila ada data yang mendekati tenggat.
   useEffect(() => {
@@ -176,7 +181,10 @@ export default function App() {
             <span className="avatar">{initials(userName)}</span>
             <span className="grow">
               <b>{userName}</b>
-              {be.user.email && <span className="muted small block">{be.user.email}</span>}
+              <span className="muted small block">
+                <span className={'role-badge ' + be.role}>{be.isAdmin ? 'Admin' : 'Staf'}</span>
+                {be.user.email && ` ${be.user.email}`}
+              </span>
             </span>
           </div>
           <div className="account-actions">
@@ -189,6 +197,11 @@ export default function App() {
             {!isOnline && (
               <button className="btn ghost small" onClick={() => fileRef.current?.click()}>
                 <Upload size={15} /> Pulihkan
+              </button>
+            )}
+            {isOnline && be.isAdmin && (
+              <button className="btn ghost small" onClick={() => setStaffOpen(true)}>
+                <Users size={15} /> Peran staf
               </button>
             )}
             {isOnline && (
@@ -257,6 +270,9 @@ export default function App() {
               onSave={(r, prev) => be.save(page, r, prev)}
               onDelete={(r) => be.remove(page, r)}
               onRestore={(r) => be.save(page, r)}
+              onImport={(recs) => be.saveMany(page, recs)}
+              canDelete={be.isAdmin}
+              files={files}
             />
           )}
         </main>
@@ -278,6 +294,9 @@ export default function App() {
         </button>
       </nav>
       {navOpen && <div className="scrim" onClick={() => setNavOpen(false)} />}
+      {staffOpen && (
+        <StaffDialog meId={be.user.id} load={be.listStaff} setRole={be.setStaffRole} onClose={closeStaff} />
+      )}
       {paletteOpen && (
         <CommandPalette
           data={data}
