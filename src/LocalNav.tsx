@@ -1,11 +1,30 @@
 import type { ReactNode } from 'react';
+import { Icon, type IconName } from './icons';
 
 /** Bilah judul halaman yang menempel di atas saat digulir, seperti di situs Apple. */
-export function LocalNav({ title, children }: { title: string; children?: ReactNode }) {
+export function LocalNav({
+  title,
+  icon,
+  mod,
+  children,
+}: {
+  title: string;
+  icon?: IconName;
+  /** Id menu, untuk warna ikonnya. */
+  mod?: string;
+  children?: ReactNode;
+}) {
   return (
-    <div className="lnav">
+    <div className="lnav" data-mod={mod}>
       <div className="lnav-inner">
-        <b className="lnav-title">{title}</b>
+        <b className="lnav-title">
+          {icon && (
+            <span className="app-icon sm">
+              <Icon name={icon} size={14} />
+            </span>
+          )}
+          {title}
+        </b>
         <div className="lnav-actions">{children}</div>
       </div>
     </div>
@@ -27,7 +46,7 @@ export function Hero({
   return (
     <header className="hero">
       <h1>
-        {title}
+        <span className="hero-title">{title}</span>
         {sub && <span className="hero-sub"> {sub}</span>}
       </h1>
       {lead && <p className="hero-lead">{lead}</p>}

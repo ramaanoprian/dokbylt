@@ -46,7 +46,7 @@ export function Board({ mod, rows, onOpen, onMove }: Props) {
             }}
           >
             <div className="col-head">
-              <span className={'col-dot ' + (i === last ? 'done' : i === 0 ? 'new' : 'mid')} />
+              <span className={'col-dot ' + (i === last ? 'done' : `s${i}`)} />
               <span className="grow">{s}</span>
               <span className="col-count">{all.length}</span>
             </div>
