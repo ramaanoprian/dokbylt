@@ -9,6 +9,7 @@ import { Icon } from './icons';
 import { RecordForm } from './RecordForm';
 import { Board } from './Board';
 import { useToast } from './toast';
+import { fmtDays, moduleStats, stageClass } from './stats';
 import {
   daysSince,
   daysUntil,
@@ -156,15 +157,37 @@ export function ModulePage({
 
   const showSkeleton = loading && rows.length === 0;
 
-  const tabs: [string, string, number][] = [
-    ['aktif', 'Berjalan', rows.filter((r) => !isDone(mod, r)).length],
-    ...mod.statuses.map((st, i): [string, string, number] => [st, st, counts[i]]),
-    ['semua', 'Semua', rows.length],
+  const month = new Date().toISOString().slice(0, 7);
+  const st = useMemo(() => moduleStats(mod, rows, month), [mod, rows, month]);
+  const last = mod.statuses.length - 1;
+  const tabs: { v: string; label: string; n: number; sub: string; cls: string }[] = [
+    {
+      v: 'aktif',
+      label: 'Berjalan',
+      n: st.active,
+      sub: st.overdue ? `${st.overdue} lewat tenggat` : st.stale ? `${st.stale} tertahan` : 'semua lancar',
+      cls: 'all' + (st.overdue ? ' alert' : ''),
+    },
+    ...mod.statuses.map((s, i) => ({
+      v: s,
+      label: s,
+      n: counts[i],
+      sub:
+        i === last
+          ? st.avgFinish === undefined
+            ? `${st.doneThisMonth} bulan ini`
+            : `rata-rata ${fmtDays(st.avgFinish)} sampai sini`
+          : counts[i]
+            ? `rata-rata ${fmtDays(st.stages[i].avgAge)} di tahap ini`
+            : 'kosong',
+      cls: stageClass(mod, s),
+    })),
+    { v: 'semua', label: 'Semua', n: rows.length, sub: `${st.thisMonth} tercatat bulan ini`, cls: 'all' },
   ];
 
   return (
     <>
-      <LocalNav title={mod.menu}>
+      <LocalNav title={mod.menu} icon={mod.icon} mod={mod.id}>
         <DataMenu
           mod={mod}
           rows={view === 'papan' ? searched : filtered}
@@ -180,7 +203,7 @@ export function ModulePage({
         </button>
       </LocalNav>
 
-      <section className="page">
+      <section className="page" data-mod={mod.id}>
         <Hero title={`${mod.title}.`} lead={mod.description} />
 
         <div className="controls">
@@ -204,17 +227,21 @@ export function ModulePage({
         </div>
 
         {view === 'tabel' ? (
-          <div className="chips" role="tablist" aria-label="Saring menurut tahap">
-            {tabs.map(([v, l, n]) => (
+          <div className="stages" role="tablist" aria-label="Saring menurut tahap">
+            {tabs.map((t) => (
               <button
-                key={v}
+                key={t.v}
                 role="tab"
-                aria-selected={statusFilter === v}
-                className={statusFilter === v ? 'on' : ''}
-                onClick={() => setStatusFilter(v)}
+                aria-selected={statusFilter === t.v}
+                className={'stage ' + t.cls + (statusFilter === t.v ? ' on' : '')}
+                onClick={() => setStatusFilter(t.v)}
               >
-                {l}
-                <span className="chip-count">{n}</span>
+                <span className="stage-name">
+                  {!t.cls.startsWith('all') && <i className={'dot ' + t.cls} />}
+                  <span className="ellipsis">{t.label}</span>
+                </span>
+                <span className="stage-num">{t.n}</span>
+                <span className="stage-sub">{t.sub}</span>
               </button>
             ))}
           </div>
@@ -287,13 +314,24 @@ export function ModulePage({
                           </td>
                         ))}
                         <td className="status-cell">
-                          <span className={'pill ' + (done ? 'done' : idx === 0 ? 'new' : 'mid')}>{r.status}</span>
+                          <span className="status-top">
+                            <span className={'pill ' + stageClass(mod, r.status)}>{r.status}</span>
+                            <span className="steps" aria-label={`Tahap ${idx + 1} dari ${mod.statuses.length}`}>
+                              {mod.statuses.map((s, si) => (
+                                <i key={s} className={si <= idx ? stageClass(mod, r.status) : ''} />
+                              ))}
+                            </span>
+                          </span>
                           {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
                             <span className={'due ' + dueTone(dueDays)} title={`Tenggat ${fmtDate(due)}`}>
                               {dueLabel(dueDays)}
                             </span>
+                          ) : done ? (
+                            <span className="due muted">selesai {fmtDate(lastMove(r))}</span>
                           ) : (
-                            !done && age >= 3 && <span className="due stale">{age} hari di tahap ini</span>
+                            <span className={'due ' + (age >= 3 ? 'stale' : 'muted')}>
+                              {age === 0 ? 'masuk tahap ini hari ini' : `${age} hari di tahap ini`}
+                            </span>
                           )}
                         </td>
                         <td className="actions" onClick={(e) => e.stopPropagation()}>
@@ -335,7 +373,7 @@ export function ModulePage({
                         </b>
                         {meta.length > 0 && <span className="mcard-meta">{meta.join(' · ')}</span>}
                         <span className="mcard-tags">
-                          <span className={'pill ' + (done ? 'done' : idx === 0 ? 'new' : 'mid')}>{r.status}</span>
+                          <span className={'pill ' + stageClass(mod, r.status)}>{r.status}</span>
                           {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
                             <span className={'due ' + dueTone(dueDays)}>{dueLabel(dueDays)}</span>
                           ) : (

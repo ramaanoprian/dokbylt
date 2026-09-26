@@ -53,6 +53,12 @@ export function ActivityBars({ data }: { data: DayBar[] }) {
   return (
     <div className="chart">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Aktivitas ${data.length} hari terakhir, total ${total}`}>
+        <defs>
+          <linearGradient id="bar-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#40a9ff" />
+            <stop offset="100%" stopColor="#0071e3" />
+          </linearGradient>
+        </defs>
         {ticks.map((t) => (
           <g key={t}>
             <line x1={padL} x2={W} y1={y(t)} y2={y(t)} className="grid" />
