@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CloudOff, Download, KeyRound, LogOut, Menu, Moon, Search, Sun, Upload, X } from 'lucide-react';
 import { MODULES, moduleById, type ModuleId } from './modules';
 import { isOnline, useBackend, type DataStore } from './backend';
@@ -8,6 +8,9 @@ import { Overview } from './Overview';
 import { ActivityPage, initials } from './ActivityPage';
 import { LoginPage, NamePrompt } from './LoginPage';
 import { CommandPalette } from './CommandPalette';
+import { ReminderBell } from './ReminderBell';
+import { collectReminders } from './reminders';
+import { useToast } from './toast';
 import { exportJson, isDone, readPref, writePref } from './util';
 
 type Page = 'ringkasan' | 'aktivitas' | ModuleId;
@@ -28,6 +31,9 @@ export default function App() {
     return p ? p === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
   });
   const fileRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
+  const reminders = useMemo(() => collectReminders(be.data), [be.data]);
+  const remindedRef = useRef(false);
 
   useEffect(() => {
     const on = () => setPage(readHash());
@@ -37,7 +43,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0f1524' : '#ffffff');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#000000' : '#f5f5f7');
   }, [dark]);
 
   const toggleTheme = useCallback(() => {
@@ -69,6 +75,25 @@ export default function App() {
     scrollTo(0, 0);
   }, []);
   const clearOpen = useCallback(() => setOpenId(undefined), []);
+
+  // Sekali per sesi browser: beri tahu bila ada data yang mendekati tenggat.
+  useEffect(() => {
+    if (remindedRef.current || be.loading || !be.user || !reminders.length) return;
+    remindedRef.current = true;
+    try {
+      if (sessionStorage.getItem('dokbylt:reminded')) return;
+      sessionStorage.setItem('dokbylt:reminded', '1');
+    } catch {
+      /* abaikan */
+    }
+    const over = reminders.filter((r) => r.days < 0).length;
+    toast(
+      over
+        ? `${over} data sudah lewat tenggat, ${reminders.length - over} lainnya segera jatuh tempo`
+        : `${reminders.length} data jatuh tempo dalam 3 hari`,
+      { label: 'Lihat', run: () => go('ringkasan') },
+    );
+  }, [reminders, be.loading, be.user, toast, go]);
 
   if (!be.authReady) return <div className="splash" />;
   if (!be.user) return <LoginPage onSignIn={be.signIn} />;
@@ -111,6 +136,9 @@ export default function App() {
             <strong>Dokumen BYLT</strong>
             <span className="muted small block">Balai Yasa Lahat</span>
           </div>
+          <span className="hide-sm push">
+            <ReminderBell items={reminders} go={go} />
+          </span>
           <button className="icon-btn only-mobile" onClick={() => setNavOpen(false)} aria-label="Tutup menu">
             <X size={20} />
           </button>
@@ -194,7 +222,9 @@ export default function App() {
             <Menu size={22} />
           </button>
           <strong>Dokumen BYLT</strong>
-          <button className="icon-btn push" onClick={() => setPaletteOpen(true)} aria-label="Cari">
+          <span className="push" />
+          <ReminderBell items={reminders} go={go} />
+          <button className="icon-btn" onClick={() => setPaletteOpen(true)} aria-label="Cari">
             <Search size={20} />
           </button>
           <button className="icon-btn" onClick={toggleTheme} aria-label="Ganti tema">

@@ -6,7 +6,7 @@ import { Icon } from './icons';
 import { RecordForm } from './RecordForm';
 import { Board } from './Board';
 import { useToast } from './toast';
-import { daysSince, exportCsv, fmtDate, isDone, lastMove, readPref, writePref } from './util';
+import { daysSince, daysUntil, deadlineOf, dueLabel, dueTone, exportCsv, fmtDate, isDone, lastMove, readPref, shown, writePref, REMIND_DAYS } from './util';
 
 interface Props {
   mod: ModuleDef;
@@ -222,11 +222,13 @@ export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onS
                 const idx = mod.statuses.indexOf(r.status);
                 const done = isDone(mod, r);
                 const age = daysSince(lastMove(r));
+                const due = deadlineOf(mod, r);
+                const dueDays = due ? daysUntil(due) : undefined;
                 return (
                   <tr key={r.id} onClick={() => setEditing({ record: r })} className="row-in">
                     {cols.map((c) => (
                       <td key={c.key} data-label={c.label}>
-                        {c.type === 'date' ? fmtDate(r.values[c.key]) : r.values[c.key] || '–'}
+                        {c.type === 'date' ? fmtDate(r.values[c.key]) : shown(c, r.values) || '–'}
                       </td>
                     ))}
                     <td data-label="Tahap">
@@ -236,7 +238,13 @@ export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onS
                         ))}
                       </span>
                       <span className={'pill ' + (done ? 'done' : idx === 0 ? 'new' : 'mid')}>{r.status}</span>
-                      {!done && age >= 3 && <span className="age">{age} hari di tahap ini</span>}
+                      {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
+                        <span className={'due ' + dueTone(dueDays)} title={`Tenggat ${fmtDate(due)}`}>
+                          {dueLabel(dueDays)}
+                        </span>
+                      ) : (
+                        !done && age >= 3 && <span className="age">{age} hari di tahap ini</span>
+                      )}
                     </td>
                     <td className="actions" onClick={(e) => e.stopPropagation()}>
                       {!done && (

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronRight, GripVertical } from 'lucide-react';
 import type { ModuleDef } from './modules';
 import type { DocRecord } from './backend';
-import { daysSince, fmtDate, lastMove } from './util';
+import { REMIND_DAYS, daysSince, daysUntil, deadlineOf, dueLabel, dueTone, fmtDate, lastMove, shown } from './util';
 
 interface Props {
   mod: ModuleDef;
@@ -57,6 +57,8 @@ export function Board({ mod, rows, onOpen, onMove }: Props) {
               )}
               {items.map((r) => {
                 const age = daysSince(lastMove(r));
+                const due = deadlineOf(mod, r);
+                const dueDays = due ? daysUntil(due) : undefined;
                 return (
                   <article
                     key={r.id}
@@ -80,8 +82,12 @@ export function Board({ mod, rows, onOpen, onMove }: Props) {
                     </div>
                     <p className="kcard-title">{titleOf(r.values)}</p>
                     <div className="kcard-tags">
-                      {meta.map((f) => r.values[f.key] && <span key={f.key} className="tag">{r.values[f.key]}</span>)}
-                      {i < last && age >= 3 && <span className="tag late">{age} hari</span>}
+                      {meta.map((f) => r.values[f.key] && <span key={f.key} className="tag">{shown(f, r.values)}</span>)}
+                      {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
+                        <span className={'due ' + dueTone(dueDays)}>{dueLabel(dueDays)}</span>
+                      ) : (
+                        i < last && age >= 3 && <span className="tag late">{age} hari</span>
+                      )}
                     </div>
                     {i < last && (
                       <button

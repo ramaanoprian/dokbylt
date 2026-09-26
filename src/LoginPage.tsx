@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { FileText, Loader2 } from 'lucide-react';
+import bg from './assets/login-bg.jpg';
 
 export function LoginPage({ onSignIn }: { onSignIn: (email: string, pw: string) => Promise<string | null> }) {
   const [email, setEmail] = useState('');
@@ -16,6 +17,7 @@ export function LoginPage({ onSignIn }: { onSignIn: (email: string, pw: string) 
 
   return (
     <div className="login">
+      <div className="login-bg" style={{ backgroundImage: `url(${bg})` }} aria-hidden />
       <form className="login-card" onSubmit={submit}>
         <span className="logo">
           <FileText size={22} />
@@ -42,6 +44,7 @@ export function LoginPage({ onSignIn }: { onSignIn: (email: string, pw: string) 
         </button>
         <p className="muted small center">Belum punya akun? Minta admin unit dokumen untuk membuatkan.</p>
       </form>
+      <p className="login-foot">Unit Dokumen · Balai Yasa Lahat</p>
     </div>
   );
 }
@@ -51,6 +54,7 @@ export function NamePrompt({ email, onSave }: { email: string; onSave: (name: st
   const [busy, setBusy] = useState(false);
   return (
     <div className="login">
+      <div className="login-bg" style={{ backgroundImage: `url(${bg})` }} aria-hidden />
       <form
         className="login-card"
         onSubmit={async (e) => {
