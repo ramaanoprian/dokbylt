@@ -1,11 +1,29 @@
-<div align="center">
+# Dashboard Dokumen BYLT
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Dashboard untuk unit dokumen Balai Yasa Lahat. Semua alur kerja unit dokumen dicatat di satu tempat:
 
-  <h1>Built with AI Studio</h2>
+| Menu | Alur |
+| --- | --- |
+| **TTD EVP** | Dokumen fisik dari unit (Justifikasi & RAB, UMDS, UMD, Tagihan, dll.) → diserahkan ke EVP → ditandatangani → didistribusikan kembali ke unit |
+| **Surat Masuk** | Surat dari luar didata → didistribusikan sesuai tujuan pada map |
+| **Kantor Pos** | Kiriman dari unit → diserahkan ke kantor pos → resi diterima → resi dikirim ke user |
+| **Multimedia** | Rekap kegiatan yang didokumentasikan: terjadwal → diliput → selesai & diarsipkan (dengan link hasil) |
+| **Arsip** | Penyerahan arsip inaktif dari unit → diverifikasi → disimpan di depo (dengan lokasi rak/boks) |
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+Halaman **Ringkasan** menampilkan jumlah pekerjaan yang masih berjalan per menu, posisi dokumen TTD EVP per unit, pekerjaan yang tertahan 3 hari atau lebih, dan aktivitas terakhir.
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+Setiap menu punya pencarian, filter per tahap, tombol untuk memindahkan ke tahap berikutnya, riwayat perpindahan tahap, dan ekspor CSV (bisa dibuka di Excel).
 
-</div>
+## Penyimpanan data
+
+Versi ini menyimpan data di browser (localStorage), jadi data hanya ada di komputer/browser yang dipakai. Gunakan **Unduh cadangan** dan **Pulihkan cadangan** di sidebar untuk membuat dan memulihkan cadangan JSON. Untuk dipakai bersama oleh beberapa orang, langkah berikutnya adalah menambahkan backend (misalnya Supabase atau Firebase).
+
+## Menjalankan
+
+```bash
+npm install
+npm run dev      # mode pengembangan
+npm run build    # hasil build di folder dist/
+```
+
+Daftar unit, jenis dokumen, tahapan, dan kolom setiap menu diatur di `src/modules.ts`.
