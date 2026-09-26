@@ -28,6 +28,8 @@ export interface ModuleDef {
   requiredForStatus?: Record<string, string[]>;
   /** Field yang dipakai sebagai tanggal utama (untuk sortir). */
   dateField: string;
+  /** Tenggat bawaan: sekian hari kerja setelah tanggal utama. Tetap bisa diubah di form. */
+  dueDays?: number;
 }
 
 export type ModuleId = 'evp' | 'surat' | 'keluar' | 'pos' | 'multimedia' | 'arsip';
@@ -44,6 +46,7 @@ const tenggat = (hint: string): Field => ({ key: 'tenggat', label: 'Tenggat', ty
 export const MODULES: ModuleDef[] = [
   {
     id: 'evp',
+    dueDays: 3,
     title: 'Penandatanganan EVP',
     menu: 'TTD EVP',
     description:
@@ -74,6 +77,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     id: 'surat',
+    dueDays: 2,
     title: 'Surat Masuk',
     menu: 'Surat Masuk',
     description: 'Surat dari luar yang masuk ke unit dokumen: didata lalu didistribusikan sesuai tujuan pada map.',
@@ -102,6 +106,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     id: 'keluar',
+    dueDays: 2,
     title: 'Surat Keluar',
     menu: 'Surat Keluar',
     description: 'Surat dari Balai Yasa Lahat untuk pihak luar: didata, ditandatangani, lalu dikirim ke tujuan.',
@@ -130,6 +135,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     id: 'pos',
+    dueDays: 2,
     title: 'Pengiriman via Kantor Pos',
     menu: 'Kantor Pos',
     description:
@@ -154,6 +160,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     id: 'multimedia',
+    dueDays: 3,
     title: 'Kegiatan Multimedia',
     menu: 'Multimedia',
     description: 'Rekap kegiatan Balai Yasa Lahat yang didokumentasikan oleh unit dokumen.',
@@ -181,6 +188,7 @@ export const MODULES: ModuleDef[] = [
   },
   {
     id: 'arsip',
+    dueDays: 5,
     title: 'Arsip & Depo Arsip',
     menu: 'Arsip',
     description: 'Penyerahan arsip inaktif dari unit ke unit dokumen dan penyimpanannya di depo arsip.',

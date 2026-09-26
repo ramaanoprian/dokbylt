@@ -374,10 +374,21 @@ export function ModulePage({
                         {meta.length > 0 && <span className="mcard-meta">{meta.join(' · ')}</span>}
                         <span className="mcard-tags">
                           <span className={'pill ' + stageClass(mod, r.status)}>{r.status}</span>
+                          <span className="steps" aria-label={`Tahap ${idx + 1} dari ${mod.statuses.length}`}>
+                            {mod.statuses.map((s, si) => (
+                              <i key={s} className={si <= idx ? stageClass(mod, r.status) : ''} />
+                            ))}
+                          </span>
+                        </span>
+                        <span className="mcard-due">
                           {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
                             <span className={'due ' + dueTone(dueDays)}>{dueLabel(dueDays)}</span>
+                          ) : done ? (
+                            <span className="due muted">Selesai {fmtDate(lastMove(r))}</span>
                           ) : (
-                            !done && age >= 3 && <span className="due stale">{age} hari</span>
+                            <span className={'due ' + (age >= 3 ? 'stale' : 'muted')}>
+                              {age === 0 ? 'Masuk tahap ini hari ini' : `${age} hari di tahap ini`}
+                            </span>
                           )}
                         </span>
                       </div>

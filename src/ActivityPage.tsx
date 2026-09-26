@@ -6,6 +6,20 @@ import { Icon } from './icons';
 import { Hero, LocalNav } from './LocalNav';
 import { fmtDate, fmtTime } from './util';
 
+type Range = '7' | '30' | 'bulan';
+const RANGES: [Range, string][] = [
+  ['7', '7 hari'],
+  ['30', '30 hari'],
+  ['bulan', 'Bulan ini'],
+];
+function rangeStart(r: Range) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (r === 'bulan') d.setDate(1);
+  else d.setDate(d.getDate() - (Number(r) - 1));
+  return d.getTime();
+}
+
 const VERB: Record<string, string> = {
   tambah: 'mencatat',
   'pindah tahap': 'memindahkan',
@@ -74,6 +88,32 @@ export function ActivityPage({
   const [mod, setMod] = useState('');
   const [q, setQ] = useState('');
   const users = useMemo(() => [...new Set(activity.map((a) => a.userName))].sort(), [activity]);
+  const [range, setRange] = useState<Range>('7');
+
+  // Ringkasan per staf dalam rentang waktu yang dipilih.
+  const team = useMemo(() => {
+    const from = rangeStart(range);
+    const inRange = activity.filter((a) => new Date(a.at).getTime() >= from);
+    const by = new Map<string, Activity[]>();
+    for (const a of inRange) by.set(a.userName, [...(by.get(a.userName) ?? []), a]);
+    const people = [...by.entries()]
+      .map(([name, list]) => ({
+        name,
+        total: list.length,
+        added: list.filter((a) => a.action === 'tambah').length,
+        moved: list.filter((a) => a.action === 'pindah tahap').length,
+        edited: list.filter((a) => a.action === 'ubah data').length,
+        perMod: MODULES.map((m) => ({ m, n: list.filter((a) => a.module === m.id).length })).filter((x) => x.n),
+        last: list[0]?.at,
+      }))
+      .sort((a, b) => b.total - a.total);
+    return {
+      total: inRange.length,
+      added: inRange.filter((a) => a.action === 'tambah').length,
+      moved: inRange.filter((a) => a.action === 'pindah tahap').length,
+      people,
+    };
+  }, [activity, range]);
 
   const groups = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -100,6 +140,88 @@ export function ActivityPage({
           lead="Setiap penambahan, perubahan, perpindahan tahap, dan penghapusan tercatat otomatis beserta akunnya."
         />
 
+        <div className="team-head">
+          <h2 className="section-title">
+            Tim. <span>Siapa mengerjakan berapa.</span>
+          </h2>
+          <div className="segmented" role="tablist" aria-label="Rentang waktu">
+            {RANGES.map(([v, l]) => (
+              <button key={v} className={range === v ? 'on' : ''} onClick={() => setRange(v)}>
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        <dl className="kpis four">
+          <div className="kpi">
+            <dt>Aktivitas</dt>
+            <dd className="kpi-num">{team.total}</dd>
+            <dd className="kpi-sub">semua jenis</dd>
+          </div>
+          <div className="kpi">
+            <dt>Dicatat</dt>
+            <dd className="kpi-num">{team.added}</dd>
+            <dd className="kpi-sub">data baru</dd>
+          </div>
+          <div className="kpi">
+            <dt>Dipindah tahap</dt>
+            <dd className="kpi-num">{team.moved}</dd>
+            <dd className="kpi-sub">langkah maju atau mundur</dd>
+          </div>
+          <div className="kpi">
+            <dt>Staf aktif</dt>
+            <dd className="kpi-num">{team.people.length}</dd>
+            <dd className="kpi-sub">dari {users.length} yang pernah tercatat</dd>
+          </div>
+        </dl>
+        {team.people.length > 0 && (
+          <div className="people">
+            {team.people.map((p) => (
+              <button
+                key={p.name}
+                className={'person' + (who === p.name ? ' on' : '')}
+                onClick={() => setWho(who === p.name ? '' : p.name)}
+                title={who === p.name ? 'Tampilkan semua staf' : `Tampilkan aktivitas ${p.name}`}
+              >
+                <span className="person-top">
+                  <span className="avatar lg">{initials(p.name)}</span>
+                  <span className="grow">
+                    <b className="ellipsis block">{p.name}</b>
+                    <span className="muted small">{p.last ? `terakhir ${fmtDate(p.last)} ${fmtTime(p.last)}` : ''}</span>
+                  </span>
+                  <span className="person-total">{p.total}</span>
+                </span>
+                <span className="person-bar" aria-hidden>
+                  {p.perMod.map(({ m, n }) => (
+                    <i key={m.id} data-mod={m.id} style={{ flexGrow: n }} />
+                  ))}
+                </span>
+                <span className="person-facts">
+                  <span>
+                    <b>{p.added}</b> dicatat
+                  </span>
+                  <span>
+                    <b>{p.moved}</b> dipindah
+                  </span>
+                  <span>
+                    <b>{p.edited}</b> diubah
+                  </span>
+                </span>
+                <span className="person-mods">
+                  {p.perMod.map(({ m, n }) => (
+                    <span key={m.id} data-mod={m.id}>
+                      <i /> {m.menu} {n}
+                    </span>
+                  ))}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <h2 className="section-title">
+          Semua aktivitas. <span>Urut dari yang terbaru.</span>
+        </h2>
         <div className="controls">
           <div className="search">
             <Search size={16} />
