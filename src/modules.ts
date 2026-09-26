@@ -30,8 +30,12 @@ export interface ModuleDef {
   dateField: string;
   /** Tenggat bawaan: sekian hari kerja setelah tanggal utama. Tetap bisa diubah di form. */
   dueDays?: number;
-  /** Tahap yang memicu pesan WA ke PIC unit (nomor di field `kontakPic`), digabung per nomor. */
+  /** Tahap-tahap yang memicu pesan WA ke PIC unit (nomor di field `kontakPic`), digabung per nomor. */
+  notifyStages?: string[];
+  /** Tahap WA "sudah ditandatangani", untuk tombol kirim ulang manual di form. */
   notifyStatus?: string;
+  /** Tahap awal sebelum diproses (didaftarkan unit sendiri lewat formulir publik). */
+  preStatus?: string;
   /** Tahap-tahap yang langsung memicu WA ke peminjam (tanpa digabung). */
   notifyOn?: string[];
 }
@@ -53,12 +57,14 @@ const tenggat = (hint: string): Field => ({ key: 'tenggat', label: 'Tenggat', ty
 export const MODULES: ModuleDef[] = [
   {
     id: 'evp',
+    preStatus: 'Didaftarkan unit',
+    notifyStages: ['Diterima dari unit', 'Ditandatangani EVP'],
     notifyStatus: 'Ditandatangani EVP',
     dueDays: 3,
     title: 'Penandatanganan EVP',
     menu: 'TTD EVP',
     description:
-      'Dokumen fisik dari unit yang butuh tanda tangan EVP: didata, diserahkan ke EVP, diambil kembali, lalu didistribusikan ke unit.',
+      'Dokumen fisik dari unit yang butuh tanda tangan EVP: didaftarkan unit lewat QR, diterima, diserahkan ke EVP, diambil kembali, lalu didistribusikan ke unit.',
     icon: 'evp',
     itemName: 'dokumen',
     dateField: 'tanggalMasuk',
@@ -82,12 +88,12 @@ export const MODULES: ModuleDef[] = [
         label: 'No. WA PIC unit',
         type: 'text',
         placeholder: '08…',
-        hint: 'Untuk mengabari PIC saat dokumen sudah ditandatangani EVP',
+        hint: 'PIC dikabari lewat WA saat dokumen diterima dan saat sudah ditandatangani EVP',
       },
       { key: 'penerima', label: 'Diterima kembali oleh (unit)', type: 'text' },
       { key: 'catatan', label: 'Catatan', type: 'textarea' },
     ],
-    statuses: ['Diterima dari unit', 'Diserahkan ke EVP', 'Ditandatangani EVP', 'Didistribusikan ke unit'],
+    statuses: ['Didaftarkan unit', 'Diterima dari unit', 'Diserahkan ke EVP', 'Ditandatangani EVP', 'Didistribusikan ke unit'],
     requiredForStatus: { 'Didistribusikan ke unit': ['penerima'] },
   },
   {
@@ -263,5 +269,8 @@ export const MODULES: ModuleDef[] = [
     requiredForStatus: { Disetujui: ['serah'] },
   },
 ];
+
+/** Tahap awal untuk data yang dicatat staf (melewati tahap "didaftarkan unit"). */
+export const firstStatus = (mod: ModuleDef) => mod.statuses.find((s) => s !== mod.preStatus) ?? mod.statuses[0];
 
 export const moduleById = (id: string) => MODULES.find((m) => m.id === id)!;

@@ -106,25 +106,38 @@ export default function App() {
     );
   }, [reminders, be.loading, be.user, toast, go]);
 
-  // Pengajuan pinjam drone dari formulir publik masuk lewat sinkronisasi: beri tahu staf.
-  const seenDrone = useRef<Set<string> | null>(null);
+  // Pengajuan dari formulir publik (pinjam drone, daftar dokumen TTD EVP) masuk lewat
+  // sinkronisasi: beri tahu staf. Beberapa dokumen dari satu pengantar digabung jadi satu kabar.
+  const seenPublic = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (be.loading || !be.user) return;
-    const rows = be.data.drone ?? [];
-    if (!seenDrone.current) {
-      seenDrone.current = new Set(rows.map((r) => r.id));
+    const incoming = [
+      ...(be.data.drone ?? []).filter((r) => r.status === 'Diajukan').map((r) => ({ r, mod: 'drone' as const })),
+      ...(be.data.evp ?? []).filter((r) => r.status === 'Didaftarkan unit').map((r) => ({ r, mod: 'evp' as const })),
+    ];
+    const all = [...(be.data.drone ?? []), ...(be.data.evp ?? [])];
+    if (!seenPublic.current) {
+      seenPublic.current = new Set(all.map((r) => r.id));
       return;
     }
-    for (const r of rows) {
-      if (seenDrone.current.has(r.id)) continue;
-      seenDrone.current.add(r.id);
-      if (r.status === 'Diajukan' && r.createdBy !== be.user.name)
-        toast(`Pengajuan pinjam drone baru dari ${r.values.pic || 'unit'} (${r.values.unitLainnya || r.values.unit || '–'})`, {
-          label: 'Lihat',
-          run: () => go('drone', r.id),
-        });
+    const fresh = incoming.filter(({ r }) => !seenPublic.current!.has(r.id) && r.createdBy !== be.user!.name);
+    for (const r of all) seenPublic.current.add(r.id);
+    const groups = new Map<string, typeof fresh>();
+    for (const x of fresh) {
+      const k = `${x.mod}|${x.r.values.kontakPic ?? x.r.id}`;
+      groups.set(k, [...(groups.get(k) ?? []), x]);
     }
-  }, [be.data.drone, be.loading, be.user, toast, go]);
+    for (const list of groups.values()) {
+      const { r, mod } = list[0];
+      const who = `${r.values.pic || 'unit'} (${r.values.unitLainnya || r.values.unit || '–'})`;
+      toast(
+        mod === 'drone'
+          ? `Pengajuan pinjam drone baru dari ${who}`
+          : `${list.length} dokumen TTD EVP didaftarkan oleh ${who}`,
+        { label: 'Lihat', run: () => go(mod, list.length === 1 ? r.id : undefined) },
+      );
+    }
+  }, [be.data.drone, be.data.evp, be.loading, be.user, toast, go]);
 
   if (!be.authReady) return <div className="splash" />;
   if (!be.user) return <LoginPage onSignIn={be.signIn} />;

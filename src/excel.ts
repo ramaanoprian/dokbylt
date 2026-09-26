@@ -1,5 +1,5 @@
 // Impor dan ekspor Excel. Pustaka dimuat saat dibutuhkan saja agar aplikasi tetap ringan.
-import { MODULES, OTHER, otherKey, type Field, type ModuleDef } from './modules';
+import { MODULES, OTHER, firstStatus, otherKey, type Field, type ModuleDef } from './modules';
 import { newId, type DataStore, type DocRecord } from './backend';
 import { defaultDue, shown, today } from './util';
 
@@ -73,7 +73,7 @@ export async function exportRekap(data: DataStore, month: string) {
 export async function downloadTemplate(mod: ModuleDef) {
   const write = await writer();
   const header = [...mod.fields.map((f) => f.label), 'Tahap'].map((h) => ({ value: h, fontWeight: 'bold' as const }));
-  const example = [...mod.fields.map((f) => ({ value: f.type === 'date' ? today() : f.options?.[0] ?? '', type: String })), { value: mod.statuses[0], type: String }];
+  const example = [...mod.fields.map((f) => ({ value: f.type === 'date' ? today() : f.options?.[0] ?? '', type: String })), { value: firstStatus(mod), type: String }];
   await write([header, example] as never, { columns: header.map(() => ({ width: 22 })) } as never).toFile(`contoh-impor-${mod.id}.xlsx`);
 }
 
@@ -178,7 +178,7 @@ export async function readImportFile(file: File, mod: ModuleDef, userName: strin
     const line = idx + 2;
     if (!row.some((c) => String(c ?? '').trim())) return;
     const values: Record<string, string> = {};
-    let status = mod.statuses[0];
+    let status = firstStatus(mod);
     map.forEach((f, i) => {
       const raw = row[i];
       if (!f || raw == null || String(raw).trim() === '' || String(raw).trim() === '-') return;

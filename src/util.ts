@@ -139,20 +139,30 @@ export function docLine(v: Record<string, string>) {
   return [jenis, v.perihal ? `"${v.perihal}"` : ''].filter(Boolean).join(' ') || 'Dokumen';
 }
 
-/** Pesan WA untuk PIC unit: satu dokumen, atau daftar bila beberapa dokumen sekaligus. */
-export function signedMessage(docs: Record<string, string>[], sender = '') {
+/** Tahap "diterima" atau "ditandatangani": isi pesan WA ke PIC berbeda. */
+export const RECEIVED_STAGE = 'Diterima dari unit';
+
+/**
+ * Pesan WA untuk PIC unit: satu dokumen, atau daftar bila beberapa dokumen sekaligus.
+ * Sama dengan fungsi message di supabase/functions/kabari-pic.
+ */
+export function signedMessage(docs: Record<string, string>[], sender = '', stage = '') {
   const v = docs[0] ?? {};
   const unit = v.unit ? ` dari unit ${v.unit}` : '';
+  const received = stage === RECEIVED_STAGE;
+  const what = received ? 'sudah kami terima dan akan kami teruskan ke EVP untuk ditandatangani' : 'sudah ditandatangani EVP';
   const body =
     docs.length > 1
-      ? [`${docs.length} dokumen berikut${unit} sudah ditandatangani EVP:`, ...docs.map((d, i) => `${i + 1}. ${docLine(d)}`)]
-      : [`${docLine(v) === 'Dokumen' ? 'Dokumen' : `Dokumen ${docLine(v)}`}${unit} sudah ditandatangani EVP.`];
+      ? [`${docs.length} dokumen berikut${unit} ${what}:`, ...docs.map((d, i) => `${i + 1}. ${docLine(d)}`)]
+      : [`${docLine(v) === 'Dokumen' ? 'Dokumen' : `Dokumen ${docLine(v)}`}${unit} ${what}.`];
   return [
     `Halo ${v.pic || 'Bapak/Ibu'},`,
     '',
     ...body,
     '',
-    'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
+    received
+      ? 'Kami akan mengabari lagi setelah dokumen ditandatangani.'
+      : 'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
     '',
     'Terima kasih,',
     ...(sender ? [sender] : []),
@@ -161,9 +171,9 @@ export function signedMessage(docs: Record<string, string>[], sender = '') {
 }
 
 /** Tautan WA untuk mengabari PIC, atau kosong bila nomornya belum diisi. */
-export function notifyUrl(docs: Record<string, string>[], sender = '') {
+export function notifyUrl(docs: Record<string, string>[], sender = '', stage = '') {
   const wa = waNumber(docs[0]?.kontakPic);
-  return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(docs, sender))}` : '';
+  return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(docs, sender, stage))}` : '';
 }
 
 export function resiMessage(v: Record<string, string>) {

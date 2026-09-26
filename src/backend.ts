@@ -79,24 +79,22 @@ const supabase: SupabaseClient | null = url && key ? createClient(url, key) : nu
 
 export type NotifyResult = { sent: true; target: string } | { sent: false; reason: string };
 
-export type NotifyKind = 'batch' | 'instant' | false;
+/** false: tidak perlu WA. "instant": peminjam drone, langsung. `{ stage }`: PIC dokumen, digabung per nomor. */
+export type NotifyKind = false | 'instant' | { stage: string };
 
-/**
- * Perlu mengabari lewat WA? "batch": PIC dokumen TTD EVP, digabung per nomor.
- * "instant": peminjam drone, dikabari langsung setiap masuk tahap tertentu.
- */
 function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord): NotifyKind {
   const def = moduleById(mod);
   if (!def || !waNumber(rec.values.kontakPic)) return false;
   if (def.notifyOn) return def.notifyOn.includes(rec.status) && prev?.status !== rec.status ? 'instant' : false;
-  if (!def.notifyStatus) return false;
-  // Kirim saat data melewati tahap itu, juga bila staf langsung melompat ke tahap sesudahnya.
-  const target = def.statuses.indexOf(def.notifyStatus);
-  const now = def.statuses.indexOf(rec.status);
-  if (now < target) return false;
-  if (prev) return def.statuses.indexOf(prev.status) < target ? 'batch' : false;
-  // Data baru (bukan data terhapus yang dikembalikan, yang sudah punya riwayat panjang).
-  return rec.history.length <= 1 ? 'batch' : false;
+  if (!def.notifyStages) return false;
+  // Data baru hanya dikabari bila memang baru (bukan data terhapus yang dikembalikan).
+  if (!prev && rec.history.length > 1) return false;
+  // Kabari tahap tertinggi yang baru dilewati, juga bila staf melompati tahap itu.
+  const idx = (s: string) => def.statuses.indexOf(s);
+  const now = idx(rec.status);
+  const before = prev ? idx(prev.status) : -1;
+  const stage = [...def.notifyStages].reverse().find((s) => before < idx(s) && idx(s) <= now);
+  return stage ? { stage } : false;
 }
 
 // Token sesi disimpan di sini agar WA yang masih antre tetap bisa dikirim saat halaman ditutup.
@@ -109,8 +107,8 @@ supabase?.auth.onAuthStateChange((_e, s) => {
  * Minta server mengirim WA ke PIC unit lewat fungsi "kabari-pic". Beberapa dokumen untuk nomor
  * yang sama digabung server menjadi satu pesan berisi daftar.
  */
-export async function sendNotify(ids: string[], keepalive = false): Promise<NotifyResult> {
-  const r = await callFunction('kabari-pic', { ids }, keepalive);
+export async function sendNotify(ids: string[], stage: string, keepalive = false): Promise<NotifyResult> {
+  const r = await callFunction('kabari-pic', { ids, stage }, keepalive);
   return r.ok ? { sent: true, target: String(r.data.target ?? '') } : { sent: false, reason: r.error };
 }
 
