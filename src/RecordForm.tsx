@@ -278,7 +278,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
                 type="button"
                 className="btn wa"
                 disabled={!waNumber(values.kontakPic) || mod.statuses.indexOf(status) < mod.statuses.indexOf(mod.notifyStatus)}
-                onClick={() => window.open(notifyUrl([values], userName), '_blank')}
+                onClick={() => window.open(notifyUrl([values]), '_blank')}
               >
                 <MessageCircle size={16} /> Kirim via WA
               </button>

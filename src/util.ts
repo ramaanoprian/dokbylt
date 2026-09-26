@@ -146,7 +146,7 @@ export const RECEIVED_STAGE = 'Diterima dari unit';
  * Pesan WA untuk PIC unit: satu dokumen, atau daftar bila beberapa dokumen sekaligus.
  * Sama dengan fungsi message di supabase/functions/kabari-pic.
  */
-export function signedMessage(docs: Record<string, string>[], sender = '', stage = '') {
+export function signedMessage(docs: Record<string, string>[], stage = '') {
   const v = docs[0] ?? {};
   const unit = v.unit ? ` dari unit ${v.unit}` : '';
   const received = stage === RECEIVED_STAGE;
@@ -161,19 +161,18 @@ export function signedMessage(docs: Record<string, string>[], sender = '', stage
     ...body,
     '',
     received
-      ? 'Kami akan mengabari lagi setelah dokumen ditandatangani.'
+      ? 'Kami akan menginformasikan lagi setelah dokumen ditandatangani.'
       : 'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
     '',
     'Terima kasih,',
-    ...(sender ? [sender] : []),
     'Unit Dokumen Balai Yasa Lahat',
   ].join('\n');
 }
 
 /** Tautan WA untuk mengabari PIC, atau kosong bila nomornya belum diisi. */
-export function notifyUrl(docs: Record<string, string>[], sender = '', stage = '') {
+export function notifyUrl(docs: Record<string, string>[], stage = '') {
   const wa = waNumber(docs[0]?.kontakPic);
-  return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(docs, sender, stage))}` : '';
+  return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(docs, stage))}` : '';
 }
 
 export function resiMessage(v: Record<string, string>) {

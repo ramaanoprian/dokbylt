@@ -38,7 +38,7 @@ function docLine(v: Record<string, string>) {
 }
 
 // Sama dengan signedMessage di src/util.ts.
-function message(docs: Record<string, string>[], sender: string, stage: string) {
+function message(docs: Record<string, string>[], stage: string) {
   const v = docs[0] ?? {};
   const unit = v.unit ? ` dari unit ${v.unit}` : '';
   const received = stage === RECEIVED;
@@ -53,11 +53,10 @@ function message(docs: Record<string, string>[], sender: string, stage: string) 
     ...body,
     '',
     received
-      ? 'Kami akan mengabari lagi setelah dokumen ditandatangani.'
+      ? 'Kami akan menginformasikan lagi setelah dokumen ditandatangani.'
       : 'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
     '',
     'Terima kasih,',
-    ...(sender ? [sender] : []),
     'Unit Dokumen Balai Yasa Lahat',
   ].join('\n');
 }
@@ -98,14 +97,12 @@ Deno.serve(async (req) => {
   }
   if (!groups.size) return json({ error: 'Belum ada dokumen yang perlu dikabari' }, 409);
 
-  const meta = user.user.user_metadata ?? {};
-  const sender = String(meta.full_name || meta.name || '').trim();
   const sent: string[] = [];
   let failure = '';
   for (const [target, docs] of groups) {
     const body = new FormData();
     body.set('target', target);
-    body.set('message', message(docs, sender, stage));
+    body.set('message', message(docs, stage));
     body.set('countryCode', '62');
     const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: token }, body });
     const out = await res.json().catch(() => ({}));
