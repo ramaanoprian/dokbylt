@@ -64,8 +64,9 @@ export function DataMenu({ mod, rows, userName, onImport }: Props) {
   return (
     <>
       <div className="menu-wrap" ref={ref}>
-        <button className="btn" onClick={() => setOpen(!open)} aria-expanded={open} title="Unduh atau impor data">
-          <FileSpreadsheet size={16} /> <span className="hide-sm">Ekspor / Impor</span> <ChevronDown size={14} className="hide-sm" />
+        <button className="lnav-link" onClick={() => setOpen(!open)} aria-expanded={open} title="Unduh atau impor data">
+          <FileSpreadsheet size={15} className="only-mobile-inline" /> <span className="hide-sm">Ekspor / Impor</span>{' '}
+          <ChevronDown size={13} className="hide-sm" />
         </button>
         {open && (
           <div className="menu-pop right" role="menu">
@@ -90,14 +91,22 @@ export function DataMenu({ mod, rows, userName, onImport }: Props) {
       </div>
 
       {(result || err) && (
-        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && !busy && (setResult(null), setErr(''))}>
+        <div
+          className="overlay"
+          onMouseDown={(e) => e.target === e.currentTarget && !busy && (setResult(null), setErr(''))}
+        >
           <div className="sheet narrow" role="dialog" aria-modal="true" aria-label="Impor data">
             <header className="sheet-head">
               <div>
                 <p className="eyebrow">{mod.title}</p>
                 <h2>Impor data</h2>
               </div>
-              <button type="button" className="icon-btn" onClick={() => (setResult(null), setErr(''))} aria-label="Tutup">
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => (setResult(null), setErr(''))}
+                aria-label="Tutup"
+              >
                 <X size={20} />
               </button>
             </header>
@@ -123,7 +132,9 @@ export function DataMenu({ mod, rows, userName, onImport }: Props) {
                           <span className="muted small">{r.status}</span>
                         </li>
                       ))}
-                      {result.records.length > 5 && <li className="muted small">dan {result.records.length - 5} lainnya…</li>}
+                      {result.records.length > 5 && (
+                        <li className="muted small">dan {result.records.length - 5} lainnya…</li>
+                      )}
                     </ul>
                   )}
                   {result.skipped.length > 0 && (
@@ -154,7 +165,12 @@ export function DataMenu({ mod, rows, userName, onImport }: Props) {
                 Batal
               </button>
               {result && (
-                <button type="button" className="btn primary" onClick={confirm} disabled={busy || !result.records.length}>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={confirm}
+                  disabled={busy || !result.records.length}
+                >
                   {busy ? 'Mengimpor…' : `Impor ${result.records.length} data`}
                 </button>
               )}
