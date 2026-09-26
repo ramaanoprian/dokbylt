@@ -437,6 +437,7 @@ export function ModulePage({
         {editing && (
           <RecordForm
             mod={mod}
+            rows={rows}
             record={editing.record}
             userName={userName}
             targetStatus={editing.targetStatus}
