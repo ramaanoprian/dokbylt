@@ -1,5 +1,5 @@
 import type { ModuleDef } from './modules';
-import type { DocRecord } from './store';
+import type { DocRecord } from './backend';
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
@@ -42,4 +42,8 @@ export function exportCsv(mod: ModuleDef, rows: DocRecord[]) {
 
 export function exportJson(data: unknown) {
   download(`dokbylt-backup-${today()}.json`, JSON.stringify(data, null, 2), 'application/json');
+}
+
+export function fmtTime(v: string) {
+  return new Date(v).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 }

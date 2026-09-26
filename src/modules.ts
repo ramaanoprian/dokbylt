@@ -1,3 +1,5 @@
+import type { IconName } from './icons';
+
 export type FieldType = 'text' | 'textarea' | 'date' | 'select' | 'number' | 'url';
 
 export interface Field {
@@ -16,7 +18,7 @@ export interface ModuleDef {
   title: string;
   menu: string;
   description: string;
-  icon: string;
+  icon: IconName;
   itemName: string;
   fields: Field[];
   /** Urutan tahapan alur kerja; tahap terakhir berarti selesai. */
@@ -38,7 +40,7 @@ export const MODULES: ModuleDef[] = [
     menu: 'TTD EVP',
     description:
       'Dokumen fisik dari unit yang butuh tanda tangan EVP: didata, diserahkan ke EVP, diambil kembali, lalu didistribusikan ke unit.',
-    icon: '✍️',
+    icon: 'evp',
     itemName: 'dokumen',
     dateField: 'tanggalMasuk',
     fields: [
@@ -66,7 +68,7 @@ export const MODULES: ModuleDef[] = [
     title: 'Surat Masuk',
     menu: 'Surat Masuk',
     description: 'Surat dari luar yang masuk ke unit dokumen: didata lalu didistribusikan sesuai tujuan pada map.',
-    icon: '📨',
+    icon: 'surat',
     itemName: 'surat',
     dateField: 'tanggalTerima',
     fields: [
@@ -94,7 +96,7 @@ export const MODULES: ModuleDef[] = [
     menu: 'Kantor Pos',
     description:
       'Paket/dokumen dari unit untuk dikirim keluar daerah: diserahkan ke kantor pos, resi diterima, lalu resi dikirim ke pengirim.',
-    icon: '📦',
+    icon: 'pos',
     itemName: 'kiriman',
     dateField: 'tanggal',
     fields: [
@@ -116,7 +118,7 @@ export const MODULES: ModuleDef[] = [
     title: 'Kegiatan Multimedia',
     menu: 'Multimedia',
     description: 'Rekap kegiatan Balai Yasa Lahat yang didokumentasikan oleh unit dokumen.',
-    icon: '📷',
+    icon: 'multimedia',
     itemName: 'kegiatan',
     dateField: 'tanggal',
     fields: [
@@ -142,7 +144,7 @@ export const MODULES: ModuleDef[] = [
     title: 'Arsip & Depo Arsip',
     menu: 'Arsip',
     description: 'Penyerahan arsip inaktif dari unit ke unit dokumen dan penyimpanannya di depo arsip.',
-    icon: '🗄️',
+    icon: 'arsip',
     itemName: 'arsip',
     dateField: 'tanggal',
     fields: [
@@ -160,4 +162,4 @@ export const MODULES: ModuleDef[] = [
   },
 ];
 
-export const moduleById = (id: ModuleId) => MODULES.find((m) => m.id === id)!;
+export const moduleById = (id: string) => MODULES.find((m) => m.id === id)!;

@@ -1,17 +1,25 @@
-import { MODULES, UNITS, type ModuleId } from './modules';
-import type { DataStore } from './store';
-import { daysSince, fmtDateTime, isDone, lastMove } from './util';
+import { ChevronRight } from 'lucide-react';
+import { MODULES, UNITS, moduleById, type ModuleId } from './modules';
+import type { Activity, DataStore } from './backend';
+import { Icon } from './icons';
+import { ActivityLine } from './ActivityPage';
+import { daysSince, isDone, lastMove } from './util';
 
 interface Props {
   data: DataStore;
-  go: (id: ModuleId) => void;
+  activity: Activity[];
+  userName: string;
+  go: (id: ModuleId | 'aktivitas') => void;
 }
 
-export function Overview({ data, go }: Props) {
-  const month = new Date().toISOString().slice(0, 7);
+const label = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.tujuan || v.asal || '';
 
-  const evp = MODULES[0];
+export function Overview({ data, activity, userName, go }: Props) {
+  const month = new Date().toISOString().slice(0, 7);
+  const evp = moduleById('evp');
   const evpActive = data.evp.filter((r) => !isDone(evp, r));
+  const hour = new Date().getHours();
+  const greet = hour < 11 ? 'Selamat pagi' : hour < 15 ? 'Selamat siang' : hour < 18 ? 'Selamat sore' : 'Selamat malam';
 
   const stale = MODULES.flatMap((m) =>
     data[m.id]
@@ -19,86 +27,95 @@ export function Overview({ data, go }: Props) {
       .map((r) => ({ m, r, age: daysSince(lastMove(r)) })),
   ).sort((a, b) => b.age - a.age);
 
-  const recent = MODULES.flatMap((m) =>
-    data[m.id].flatMap((r) => r.history.map((h) => ({ m, r, h }))),
-  )
-    .sort((a, b) => b.h.at.localeCompare(a.h.at))
-    .slice(0, 8);
-
-  const label = (m: (typeof MODULES)[number], r: DataStore[ModuleId][number]) =>
-    r.values.perihal || r.values.kegiatan || r.values.uraian || r.values.tujuan || r.values.asal || m.itemName;
-
   return (
     <section>
       <header className="page-head">
         <div>
-          <h1>Ringkasan</h1>
-          <p className="muted">Semua alur kerja unit dokumen Balai Yasa Lahat dalam satu tempat.</p>
+          <h1>
+            {greet}
+            {userName ? `, ${userName.split(' ')[0]}` : ''}
+          </h1>
+          <p className="muted">Ringkasan semua alur kerja unit dokumen Balai Yasa Lahat.</p>
         </div>
       </header>
 
-      <div className="cards">
+      <div className="stats">
         {MODULES.map((m) => {
           const rows = data[m.id];
           const active = rows.filter((r) => !isDone(m, r)).length;
           const thisMonth = rows.filter((r) => (r.values[m.dateField] ?? '').startsWith(month)).length;
           return (
-            <button key={m.id} className="card" onClick={() => go(m.id)}>
-              <span className="card-icon" aria-hidden>
-                {m.icon}
+            <button key={m.id} className="stat" onClick={() => go(m.id)}>
+              <span className={`chip-icon c-${m.id}`}>
+                <Icon name={m.icon} />
               </span>
-              <span className="card-title">{m.title}</span>
-              <span className="card-num">{active}</span>
-              <span className="muted small">masih berjalan · {thisMonth} bulan ini</span>
+              <span className="stat-title">{m.menu}</span>
+              <span className="stat-num">{active}</span>
+              <span className="muted small">berjalan · {thisMonth} bulan ini</span>
             </button>
           );
         })}
       </div>
 
-      <div className="two-col">
-        <div className="panel">
-          <h2>TTD EVP per unit</h2>
-          <table className="mini">
-            <thead>
-              <tr>
-                <th>Unit</th>
-                {evp.statuses.slice(0, -1).map((s) => (
-                  <th key={s}>{s}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {UNITS.map((u) => {
-                const rows = evpActive.filter((r) => r.values.unit === u);
-                if (!rows.length) return null;
-                return (
-                  <tr key={u}>
-                    <td>{u}</td>
-                    {evp.statuses.slice(0, -1).map((s) => (
-                      <td key={s}>{rows.filter((r) => r.status === s).length || '–'}</td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {evpActive.length === 0 && <p className="muted small">Tidak ada dokumen yang sedang menunggu.</p>}
+      <div className="grid-2">
+        <div className="card pad">
+          <div className="card-head">
+            <h2>TTD EVP per unit</h2>
+            <button className="link" onClick={() => go('evp')}>
+              Buka <ChevronRight size={14} />
+            </button>
+          </div>
+          {evpActive.length === 0 ? (
+            <p className="muted small">Tidak ada dokumen yang sedang menunggu.</p>
+          ) : (
+            <div className="table-wrap">
+            <table className="mini">
+              <thead>
+                <tr>
+                  <th>Unit</th>
+                  {evp.statuses.slice(0, -1).map((s) => (
+                    <th key={s}>{s}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {UNITS.map((u) => {
+                  const rows = evpActive.filter((r) => r.values.unit === u);
+                  if (!rows.length) return null;
+                  return (
+                    <tr key={u}>
+                      <td>{u}</td>
+                      {evp.statuses.slice(0, -1).map((s) => (
+                        <td key={s}>{rows.filter((r) => r.status === s).length || '–'}</td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            </div>
+          )}
         </div>
 
-        <div className="panel">
-          <h2>Perlu ditindaklanjuti</h2>
+        <div className="card pad">
+          <div className="card-head">
+            <h2>Perlu ditindaklanjuti</h2>
+            {stale.length > 0 && <span className="pill warn">{stale.length}</span>}
+          </div>
           {stale.length === 0 ? (
             <p className="muted small">Tidak ada pekerjaan yang tertahan 3 hari atau lebih.</p>
           ) : (
-            <ul className="list">
-              {stale.slice(0, 8).map(({ m, r, age }) => (
-                <li key={r.id}>
-                  <button className="link" onClick={() => go(m.id)}>
-                    {m.icon} {label(m, r)}
-                  </button>
-                  <span className="muted small">
-                    {r.status} · {age} hari
+            <ul className="rows">
+              {stale.slice(0, 6).map(({ m, r, age }) => (
+                <li key={r.id} className="clickable" onClick={() => go(m.id)}>
+                  <span className={`chip-icon sm c-${m.id}`}>
+                    <Icon name={m.icon} size={14} />
                   </span>
+                  <span className="grow">
+                    {label(r.values) || m.itemName}
+                    <span className="muted small block">{r.status}</span>
+                  </span>
+                  <span className="age">{age} hari</span>
                 </li>
               ))}
             </ul>
@@ -106,19 +123,19 @@ export function Overview({ data, go }: Props) {
         </div>
       </div>
 
-      <div className="panel">
-        <h2>Aktivitas terakhir</h2>
-        {recent.length === 0 ? (
+      <div className="card pad">
+        <div className="card-head">
+          <h2>Aktivitas terakhir</h2>
+          <button className="link" onClick={() => go('aktivitas')}>
+            Semua riwayat <ChevronRight size={14} />
+          </button>
+        </div>
+        {activity.length === 0 ? (
           <p className="muted small">Belum ada aktivitas. Mulai dengan mencatat dokumen di salah satu menu.</p>
         ) : (
-          <ul className="list">
-            {recent.map(({ m, r, h }, i) => (
-              <li key={i}>
-                <span>
-                  {m.icon} {label(m, r)} → <b>{h.status}</b>
-                </span>
-                <span className="muted small">{fmtDateTime(h.at)}</span>
-              </li>
+          <ul className="rows">
+            {activity.slice(0, 6).map((a) => (
+              <ActivityLine key={a.id} a={a} />
             ))}
           </ul>
         )}
