@@ -81,8 +81,15 @@ export type NotifyResult = { sent: true; target: string } | { sent: false; reaso
 
 /** Perlu kirim WA ke PIC: baru masuk ke tahap pemicu dan nomor PIC terisi. */
 function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord) {
-  const at = moduleById(mod)?.notifyStatus;
-  return !!at && rec.status === at && prev?.status !== at && !!waNumber(rec.values.kontakPic);
+  const def = moduleById(mod);
+  if (!def?.notifyStatus || !waNumber(rec.values.kontakPic)) return false;
+  // Kirim saat data melewati tahap itu, juga bila staf langsung melompat ke tahap sesudahnya.
+  const target = def.statuses.indexOf(def.notifyStatus);
+  const now = def.statuses.indexOf(rec.status);
+  if (now < target) return false;
+  if (prev) return def.statuses.indexOf(prev.status) < target;
+  // Data baru (bukan data terhapus yang dikembalikan, yang sudah punya riwayat panjang).
+  return rec.history.length <= 1;
 }
 
 /** Minta server mengirim WA ke PIC unit lewat fungsi "kabari-pic". */
