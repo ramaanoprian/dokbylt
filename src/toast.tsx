@@ -9,10 +9,10 @@ interface ToastAction {
 interface Toast {
   id: number;
   text: string;
-  action?: ToastAction;
+  actions: ToastAction[];
 }
 
-const Ctx = createContext<(text: string, action?: ToastAction) => void>(() => {});
+const Ctx = createContext<(text: string, action?: ToastAction | ToastAction[]) => void>(() => {});
 
 export const useToast = () => useContext(Ctx);
 
@@ -23,10 +23,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
 
   const show = useCallback(
-    (text: string, action?: ToastAction) => {
+    (text: string, action?: ToastAction | ToastAction[]) => {
       const id = ++seq.current;
-      setToasts((t) => [...t.slice(-2), { id, text, action }]);
-      setTimeout(() => dismiss(id), action ? 6000 : 3500);
+      const actions = action ? (Array.isArray(action) ? action : [action]) : [];
+      setToasts((t) => [...t.slice(-2), { id, text, actions }]);
+      setTimeout(() => dismiss(id), actions.length > 1 ? 10000 : actions.length ? 6000 : 3500);
     },
     [dismiss],
   );
@@ -39,17 +40,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div key={t.id} className="toast-item">
             <CheckCircle2 size={18} className="toast-ok" />
             <span className="grow">{t.text}</span>
-            {t.action && (
+            {t.actions.map((a) => (
               <button
+                key={a.label}
                 className="toast-action"
                 onClick={() => {
-                  t.action!.run();
+                  a.run();
                   dismiss(t.id);
                 }}
               >
-                {t.action.label}
+                {a.label}
               </button>
-            )}
+            ))}
             <button className="icon-btn" onClick={() => dismiss(t.id)} aria-label="Tutup">
               <X size={16} />
             </button>

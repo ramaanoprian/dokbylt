@@ -141,6 +141,9 @@ const ALIASES: Record<string, string[]> = {
   nosurat: ['nomorSurat', 'nomor'],
   jenisdokumen: ['jenis'],
   asaltujuan: ['asal', 'tujuan'],
+  nowa: ['kontakPic', 'kontak'],
+  nowapic: ['kontakPic'],
+  nohp: ['kontakPic', 'kontak'],
 };
 
 function matchField(mod: ModuleDef, header: string): Field | undefined {

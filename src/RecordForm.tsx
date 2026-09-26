@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, MessageCircle, Printer, X } from 'lucide-react';
 import { OTHER, otherKey, type ModuleDef } from './modules';
 import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
-import { daysUntil, defaultDue, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
+import { daysUntil, defaultDue, notifyUrl, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
 import { Icon } from './icons';
 import { stageClass } from './stats';
 import { Attachments, type FileApi } from './Attachments';
@@ -216,6 +216,29 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
               </div>
               <button type="button" className="btn wa" onClick={sendResi} disabled={!canSendResi}>
                 <MessageCircle size={16} /> {mail && !wa ? 'Kirim email' : 'Kirim via WA'}
+              </button>
+            </div>
+          )}
+
+          {mod.notifyStatus && (
+            <div className="resi-box">
+              <div className="grow">
+                <b>Kabari PIC unit</b>
+                <span className="muted small block">
+                  {!waNumber(values.kontakPic)
+                    ? 'Isi No. WA PIC unit agar PIC dikabari otomatis saat dokumen sudah ditandatangani EVP.'
+                    : mod.statuses.indexOf(status) < mod.statuses.indexOf(mod.notifyStatus)
+                      ? `WA terkirim otomatis ke ${values.pic || 'PIC'} saat tahap jadi “${mod.notifyStatus}”.`
+                      : `Kirim ulang kabar ke ${values.pic || 'PIC'} lewat WhatsApp Anda bila perlu.`}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="btn wa"
+                disabled={!waNumber(values.kontakPic) || mod.statuses.indexOf(status) < mod.statuses.indexOf(mod.notifyStatus)}
+                onClick={() => window.open(notifyUrl(values), '_blank')}
+              >
+                <MessageCircle size={16} /> Kirim via WA
               </button>
             </div>
           )}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
-import { MODULES, type ModuleId } from './modules';
+import { MODULES, moduleById, type ModuleId } from './modules';
+import { waNumber } from './util';
 
 export interface HistoryEntry {
   status: string;
@@ -75,6 +76,31 @@ const ACTIVITY_LIMIT = 500;
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 const supabase: SupabaseClient | null = url && key ? createClient(url, key) : null;
+
+export type NotifyResult = { sent: true; target: string } | { sent: false; reason: string };
+
+/** Perlu kirim WA ke PIC: baru masuk ke tahap pemicu dan nomor PIC terisi. */
+function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord) {
+  const at = moduleById(mod)?.notifyStatus;
+  return !!at && rec.status === at && prev?.status !== at && !!waNumber(rec.values.kontakPic);
+}
+
+/** Minta server mengirim WA ke PIC unit lewat fungsi "kabari-pic". */
+async function invokeNotify(id: string): Promise<NotifyResult> {
+  if (!supabase) return { sent: false, reason: 'mode lokal' };
+  const { data, error } = await supabase.functions.invoke('kabari-pic', { body: { id } });
+  if (error) {
+    let reason = error.message;
+    try {
+      const body = await (error as { context?: Response }).context?.json();
+      if (body?.error) reason = body.error;
+    } catch {
+      /* pakai pesan bawaan */
+    }
+    return { sent: false, reason };
+  }
+  return { sent: true, target: data?.target ?? '' };
+}
 
 /** true bila aplikasi terhubung ke server; false berarti mode lokal (data di browser). */
 export const isOnline = supabase !== null;
@@ -296,8 +322,9 @@ export function useBackend() {
     );
 
   const save = useCallback(
-    async (mod: ModuleId, rec: DocRecord, prev?: DocRecord) => {
+    async (mod: ModuleId, rec: DocRecord, prev?: DocRecord): Promise<NotifyResult | undefined> => {
       setData((d) => withRecord(d, mod, rec));
+      const notify = shouldNotify(mod, rec, prev);
       if (!supabase) {
         if (!prev) logLocal(mod, 'tambah', rec, rec.status);
         else {
@@ -307,7 +334,7 @@ export function useBackend() {
           );
           if (changed.length) logLocal(mod, 'ubah data', rec, changed.join(', '));
         }
-        return;
+        return notify ? { sent: false, reason: 'mode lokal' } : undefined;
       }
       // Insert dan update dipisah (bukan upsert): trigger BEFORE INSERT ikut jalan pada upsert
       // dan akan mencatat "tambah" palsu di riwayat.
@@ -318,7 +345,9 @@ export function useBackend() {
       if (e) {
         setError('Gagal menyimpan: ' + e.message);
         loadAll();
+        return undefined;
       }
+      return notify ? invokeNotify(rec.id) : undefined;
     },
     [loadAll],
   );

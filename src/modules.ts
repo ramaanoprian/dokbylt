@@ -30,6 +30,8 @@ export interface ModuleDef {
   dateField: string;
   /** Tenggat bawaan: sekian hari kerja setelah tanggal utama. Tetap bisa diubah di form. */
   dueDays?: number;
+  /** Tahap yang memicu pesan WA ke PIC unit (nomor di field `kontakPic`). */
+  notifyStatus?: string;
 }
 
 export type ModuleId = 'evp' | 'surat' | 'keluar' | 'pos' | 'multimedia' | 'arsip';
@@ -46,6 +48,7 @@ const tenggat = (hint: string): Field => ({ key: 'tenggat', label: 'Tenggat', ty
 export const MODULES: ModuleDef[] = [
   {
     id: 'evp',
+    notifyStatus: 'Ditandatangani EVP',
     dueDays: 3,
     title: 'Penandatanganan EVP',
     menu: 'TTD EVP',
@@ -69,6 +72,13 @@ export const MODULES: ModuleDef[] = [
       { key: 'nomor', label: 'Nomor dokumen', type: 'text', inTable: true },
       { key: 'perihal', label: 'Perihal', type: 'text', required: true, inTable: true },
       { key: 'pic', label: 'PIC unit (pengantar)', type: 'text' },
+      {
+        key: 'kontakPic',
+        label: 'No. WA PIC unit',
+        type: 'text',
+        placeholder: '08…',
+        hint: 'Untuk mengabari PIC saat dokumen sudah ditandatangani EVP',
+      },
       { key: 'penerima', label: 'Diterima kembali oleh (unit)', type: 'text' },
       { key: 'catatan', label: 'Catatan', type: 'textarea' },
     ],
