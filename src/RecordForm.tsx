@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import type { ModuleDef } from './modules';
 import { newId, type DocRecord, type HistoryEntry } from './backend';
@@ -32,6 +32,12 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
   ]);
   const missing = mod.fields.filter((f) => needed.has(f.key) && !values[f.key]?.trim());
   const set = (k: string, v: string) => setValues({ ...values, [k]: v });
+
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    addEventListener('keydown', on);
+    return () => removeEventListener('keydown', on);
+  }, [onClose]);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,6 +98,7 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
                   <textarea rows={3} value={values[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)} />
                 ) : (
                   <input
+                    autoFocus={!record && f === mod.fields.find((x) => x.type !== 'date')}
                     type={f.type}
                     placeholder={f.placeholder}
                     min={f.type === 'number' ? 0 : undefined}
@@ -144,7 +151,7 @@ export function RecordForm({ mod, record, userName, targetStatus, onSave, onDele
             <button
               type="button"
               className="btn ghost danger"
-              onClick={() => confirm(`Hapus ${mod.itemName} ini? Tindakan ini tercatat di riwayat.`) && onDelete()}
+              onClick={onDelete}
             >
               Hapus
             </button>
