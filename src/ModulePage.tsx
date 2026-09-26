@@ -23,6 +23,9 @@ interface Props {
 type Editing = { record?: DocRecord; targetStatus?: string } | null;
 type View = 'tabel' | 'papan';
 
+/** Kolom yang paling menggambarkan data; dipakai sebagai judul kartu di HP. */
+const TITLE_KEYS = ['perihal', 'kegiatan', 'uraian', 'tujuan', 'asal', 'pengirim'];
+
 export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onSave, onDelete, onRestore }: Props) {
   const toast = useToast();
   const [q, setQ] = useState('');
@@ -121,7 +124,7 @@ export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onS
             <p className="muted">{mod.description}</p>
           </div>
         </div>
-        <button className="btn primary" onClick={() => setEditing({})} title="Pintasan: N">
+        <button className="btn primary add-btn" onClick={() => setEditing({})} title="Pintasan: N">
           <Plus size={18} /> Tambah {mod.itemName}
         </button>
       </header>
@@ -138,7 +141,7 @@ export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onS
           >
             <span className="flow-count">{counts[i]}</span>
             <span className="flow-label">
-              <span className="muted small">Tahap {i + 1}</span>
+              <span className="muted small hide-sm">Tahap {i + 1}</span>
               {s}
             </span>
             <span
@@ -258,8 +261,57 @@ export function ModulePage({ mod, rows, userName, loading, openId, onOpened, onS
               })}
             </tbody>
           </table>
+          {/* Di HP data tampil sebagai daftar kartu ringkas, bukan tabel. */}
+          <ul className="mlist">
+            {filtered.map((r) => {
+              const idx = mod.statuses.indexOf(r.status);
+              const done = isDone(mod, r);
+              const age = daysSince(lastMove(r));
+              const due = deadlineOf(mod, r);
+              const dueDays = due ? daysUntil(due) : undefined;
+              const titleKey = TITLE_KEYS.find((k) => cols.some((c) => c.key === k) && r.values[k]);
+              const meta = cols
+                .filter((c) => c.key !== titleKey && r.values[c.key])
+                .map((c) => (c.type === 'date' ? fmtDate(r.values[c.key]) : shown(c, r.values)));
+              return (
+                <li key={r.id} className="mcard row-in" onClick={() => setEditing({ record: r })}>
+                  <div className="mcard-main">
+                    <b className="mcard-title">{(titleKey && r.values[titleKey]) || mod.itemName}</b>
+                    {meta.length > 0 && <span className="mcard-meta">{meta.join(' · ')}</span>}
+                    <span className="mcard-tags">
+                      <span className={'pill ' + (done ? 'done' : idx === 0 ? 'new' : 'mid')}>{r.status}</span>
+                      {dueDays !== undefined && dueDays <= REMIND_DAYS ? (
+                        <span className={'due ' + dueTone(dueDays)}>{dueLabel(dueDays)}</span>
+                      ) : (
+                        !done && age >= 3 && <span className="age">{age} hari</span>
+                      )}
+                    </span>
+                  </div>
+                  {!done ? (
+                    <button
+                      className="mcard-next"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        moveTo(r, mod.statuses[idx + 1]);
+                      }}
+                      aria-label={`Pindahkan ke ${mod.statuses[idx + 1]}`}
+                      title={mod.statuses[idx + 1]}
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  ) : (
+                    <ChevronRight className="mcard-chev" size={18} aria-hidden />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
+
+      <button className="fab" onClick={() => setEditing({})} aria-label={`Tambah ${mod.itemName}`}>
+        <Plus size={26} />
+      </button>
 
       {editing && (
         <RecordForm
