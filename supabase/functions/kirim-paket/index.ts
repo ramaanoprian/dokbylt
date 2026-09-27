@@ -5,6 +5,7 @@
 //   lihat   kurir membuka tautan pribadinya dari WA (butuh token; satu tautan bisa beberapa paket)
 //   pickup  kurir menandai paket sudah diambil
 //   resi    kurir mengisi nomor resi (dan foto resi bila ada); resi dan foto langsung diteruskan ke pemohon
+//   foto    tautan pendek foto resi (#f/<kode>) di WA pemohon: kembalikan tautan sementara ke fotonya
 // Dengan login staf:
 //   kabari  kirim WA untuk beberapa paket sekaligus, digabung per nomor: ke pemohon saat paket diterima, ke kurir saat
 //           proses pengiriman, dan resi ke pemohon saat tahap "Resi dikirim ke user"
@@ -93,7 +94,7 @@ interface Att {
   name: string;
 }
 
-/** Tautan sementara (30 hari) ke foto resi terbaru satu paket, bila ada. */
+/** Tautan sementara (1 jam) ke foto resi terbaru satu paket, bila ada. */
 async function resiPhoto(r: Rec) {
   let latest: Att | null = null;
   try {
@@ -103,8 +104,20 @@ async function resiPhoto(r: Rec) {
     // lampiran rusak: lewati
   }
   if (!latest) return '';
-  const { data } = await admin.storage.from(BUCKET).createSignedUrl(latest.path, 30 * 24 * 3600);
+  const { data } = await admin.storage.from(BUCKET).createSignedUrl(latest.path, 3600);
   return data?.signedUrl ?? '';
+}
+
+const KODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+const newKode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => KODE_CHARS[b % KODE_CHARS.length]).join('');
+
+/** Tautan pendek ke foto resi paket (#f/<kode>); kodenya dibuat sekali dan disimpan di paket. */
+async function shortFoto(r: Rec) {
+  if (!r.values.fotoKode) {
+    r.values = { ...r.values, fotoKode: newKode() };
+    await admin.from('records').update({ values: r.values }).eq('id', r.id);
+  }
+  return `${SITE}/#f/${r.values.fotoKode}`;
 }
 
 async function tellStaff(text: string) {
@@ -226,11 +239,12 @@ async function notify(recs: Rec[], stage: string) {
     // dikirim sebagai gambar terpisah bila paket Fonnte mendukung lampiran.
     const photos =
       stage === SENT
-        ? (await Promise.all(list.map(async (r) => ({ r, url: await resiPhoto(r) })))).filter((x) => x.url)
+        ? (await Promise.all(list.map(async (r) => ({ r, url: await resiPhoto(r), link: '' })))).filter((x) => x.url)
         : [];
+    for (const x of photos) x.link = await shortFoto(x.r);
     if (photos.length)
       text += `\n\nFoto resi:\n${photos
-        .map((x) => (list.length > 1 ? `${list.indexOf(x.r) + 1}. ${x.url}` : x.url))
+        .map((x) => (list.length > 1 ? `${list.indexOf(x.r) + 1}. ${x.link}` : x.link))
         .join('\n')}`;
     const fail = await sendWa(target, text);
     if (fail) failure = fail;
@@ -370,6 +384,19 @@ Deno.serve(async (req) => {
           ].join('\n'),
         );
         return json({ ok: true, count: recs.length });
+      }
+
+      case 'foto': {
+        const kode = clean(input.kode, 16);
+        if (!/^[A-Za-z0-9]{6,16}$/.test(kode)) return json({ error: 'Tautan tidak valid' }, 404);
+        const { data } = await admin
+          .from('records')
+          .select('id, module, status, values, history')
+          .eq('module', 'pos')
+          .eq('values->>fotoKode', kode)
+          .limit(1);
+        const url = data?.[0] ? await resiPhoto(data[0] as Rec) : '';
+        return url ? json({ ok: true, url }) : json({ error: 'Foto tidak ditemukan' }, 404);
       }
 
       case 'lihat': {

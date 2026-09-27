@@ -2,6 +2,7 @@
 //   #kirim-paket              formulir permohonan dari unit (dibuka dari QR), boleh beberapa paket
 //   #kirim-paket/<id>.<token>[,<id>.<token>…] halaman kurir untuk satu atau beberapa paket:
 //                             konfirmasi pick-up lalu kirim nomor dan foto resi
+//   #f/<kode>                 tautan pendek foto resi untuk pemohon (dari WA), diteruskan ke fotonya
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Camera, Check, Loader2, Package, Plus, Trash2, X } from 'lucide-react';
 import { callFunction } from './backend';
@@ -40,10 +41,13 @@ const parseRoute = (): Pair[] | null => {
   return pairs.length ? pairs : null;
 };
 
-export const isPosRoute = () => location.hash.startsWith('#kirim-paket');
+const fotoKode = () => location.hash.match(/^#f\/([A-Za-z0-9]{6,16})$/)?.[1] ?? '';
+
+export const isPosRoute = () => location.hash.startsWith('#kirim-paket') || !!fotoKode();
 
 export function PosPublic() {
   const [route, setRoute] = useState(parseRoute);
+  const [kode] = useState(fotoKode);
   useEffect(() => {
     const dark = readPref('theme', '');
     document.documentElement.dataset.theme =
@@ -66,8 +70,32 @@ export function PosPublic() {
           <span className="muted small block">Unit Dokumen · Balai Yasa Lahat</span>
         </span>
       </header>
-      {route ? <CourierPage items={route} /> : <RequestForm />}
+      {kode ? <FotoResi kode={kode} /> : route ? <CourierPage items={route} /> : <RequestForm />}
     </div>
+  );
+}
+
+/** Tautan pendek foto resi: minta tautan asli yang berlaku sementara, lalu buka fotonya. */
+function FotoResi({ kode }: { kode: string }) {
+  const [error, setError] = useState('');
+  useEffect(() => {
+    callFunction('kirim-paket', { action: 'foto', kode }).then((r) =>
+      r.ok ? (r.data.url ? location.replace(String(r.data.url)) : setError('Foto tidak ditemukan')) : setError(r.error),
+    );
+  }, [kode]);
+  return (
+    <main className="public-card">
+      {error ? (
+        <>
+          <h1>Foto resi tidak bisa dibuka.</h1>
+          <p className="muted">{error}. Hubungi Unit Dokumen bila perlu.</p>
+        </>
+      ) : (
+        <p className="muted">
+          <Loader2 size={18} className="spin" /> Membuka foto resi…
+        </p>
+      )}
+    </main>
   );
 }
 
