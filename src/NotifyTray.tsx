@@ -5,7 +5,7 @@ import { useToast } from './toast';
 import { RECEIVED_STAGE, notifyUrl } from './util';
 
 /** WA ke PIC yang masih menunggu digabung, dengan hitung mundur dan tombol kirim sekarang. */
-export function NotifyTray({ userName }: { userName: string }) {
+export function NotifyTray() {
   const batches = useNotifyQueue();
   const toast = useToast();
   const [now, setNow] = useState(Date.now());
@@ -28,14 +28,13 @@ export function NotifyTray({ userName }: { userName: string }) {
               window.open(
                 notifyUrl(
                   b.docs.map((d) => d.values),
-                  userName,
                   b.stage,
                 ),
                 '_blank',
               ),
           });
       }),
-    [toast, userName],
+    [toast],
   );
 
   if (!batches.length) return null;

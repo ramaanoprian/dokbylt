@@ -68,10 +68,10 @@ const period = (v: Values) =>
 
 const linkOf = (r: Rec) => `${SITE}/#pinjam-drone/${r.id}.${r.values.token}`;
 
-function message(r: Rec, sender = '') {
+function message(r: Rec) {
   const v = r.values;
   const hi = `Halo ${v.pic || 'Bapak/Ibu'},`;
-  const close = ['', 'Terima kasih,', ...(sender ? [sender] : []), SIGN];
+  const close = ['', 'Terima kasih,', SIGN];
   const lines: Record<string, string[]> = {
     Diajukan: [
       `Pengajuan peminjaman drone untuk ${v.keperluan || 'kegiatan unit'} pada ${period(v)} sudah kami terima.`,
@@ -263,8 +263,7 @@ Deno.serve(async (req) => {
         }
         const target = waNumber(r.values.kontakPic);
         if (!target) return json({ error: 'Nomor WA peminjam belum diisi' }, 422);
-        const meta = user.user.user_metadata ?? {};
-        const fail = await sendWa(target, message(r, String(meta.full_name || meta.name || '').trim()));
+        const fail = await sendWa(target, message(r));
         return fail ? json({ error: fail }, 502) : json({ ok: true, target });
       }
 

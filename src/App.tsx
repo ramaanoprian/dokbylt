@@ -316,7 +316,7 @@ export default function App() {
           </span>
         </div>
       </footer>
-      <NotifyTray userName={userName} />
+      <NotifyTray />
       {staffOpen && (
         <StaffDialog meId={be.user.id} load={be.listStaff} setRole={be.setStaffRole} onClose={closeStaff} />
       )}
