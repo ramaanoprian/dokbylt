@@ -2,9 +2,18 @@ import { useEffect, useState } from 'react';
 import { MessageCircle, Send, X } from 'lucide-react';
 import { NOTIFY_WAIT_MS, cancelNotify, flush, onNotifyResult, useNotifyQueue } from './notifyQueue';
 import { useToast } from './toast';
+import { moduleById } from './modules';
 import { RECEIVED_STAGE, notifyUrl } from './util';
 
-/** WA ke PIC yang masih menunggu digabung, dengan hitung mundur dan tombol kirim sekarang. */
+/** Keterangan singkat tahap di antrean, mis. "3 kiriman siap di-pick up". */
+const STAGE_WORD: Record<string, string> = {
+  [RECEIVED_STAGE]: 'diterima',
+  'Ditandatangani EVP': 'selesai TTD',
+  'Proses pengiriman': 'siap di-pick up',
+  'Resi dikirim ke user': 'dengan resi',
+};
+
+/** WA ke PIC, pemohon, atau kurir yang masih menunggu digabung, dengan hitung mundur dan tombol kirim sekarang. */
 export function NotifyTray() {
   const batches = useNotifyQueue();
   const toast = useToast();
@@ -19,8 +28,11 @@ export function NotifyTray() {
   useEffect(
     () =>
       onNotifyResult((b, r) => {
-        const what = b.docs.length > 1 ? `${b.docs.length} dokumen` : 'dokumen';
+        const item = moduleById(b.mod).itemName;
+        const what = b.docs.length > 1 ? `${b.docs.length} ${item}` : item;
         if (r.sent) toast(`WA ke ${b.pic} terkirim (${what})`);
+        // Pesan paket berisi tautan pribadi kurir yang dibuat server, jadi tidak ada cadangan wa.me.
+        else if (b.mod !== 'evp') toast(`WA ke ${b.pic} belum terkirim (${r.reason})`);
         else
           toast(`WA ke ${b.pic} belum terkirim (${r.reason})`, {
             label: 'Kirim via WA',
@@ -51,9 +63,9 @@ export function NotifyTray() {
               <b className="ellipsis block">WA ke {b.pic}</b>
               <span
                 className="muted small ellipsis block"
-                title={`Dokumen lain untuk ${b.pic} dalam waktu ini ikut digabung`}
+                title={`${moduleById(b.mod).itemName} lain untuk ${b.pic} dalam waktu ini ikut digabung`}
               >
-                {b.docs.length} dokumen {b.stage === RECEIVED_STAGE ? 'diterima' : 'selesai TTD'} · {left} dtk lagi
+                {b.docs.length} {moduleById(b.mod).itemName} {STAGE_WORD[b.stage] ?? b.stage.toLowerCase()} · {left} dtk lagi
               </span>
             </span>
             <button className="btn small primary" onClick={() => void flush(b.key)}>

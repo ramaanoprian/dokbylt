@@ -125,7 +125,7 @@ export default function App() {
     for (const r of all) seenPublic.current.add(r.id);
     const groups = new Map<string, typeof fresh>();
     for (const x of fresh) {
-      const k = `${x.mod}|${x.r.values.kontakPic ?? x.r.id}`;
+      const k = `${x.mod}|${x.r.values.kontakPic ?? x.r.values.kontak ?? x.r.id}`;
       groups.set(k, [...(groups.get(k) ?? []), x]);
     }
     for (const list of groups.values()) {
@@ -135,7 +135,7 @@ export default function App() {
         mod === 'drone'
           ? `Pengajuan pinjam drone baru dari ${who}`
           : mod === 'pos'
-            ? `Permohonan kirim paket dari ${who}`
+            ? `${list.length > 1 ? `${list.length} permohonan` : 'Permohonan'} kirim paket dari ${who}`
             : `${list.length} dokumen TTD EVP didaftarkan oleh ${who}`,
         { label: 'Lihat', run: () => go(mod, list.length === 1 ? r.id : undefined) },
       );
@@ -150,15 +150,25 @@ export default function App() {
     const before = posStatus.current;
     posStatus.current = new Map(rows.map((r) => [r.id, r.status]));
     if (!before) return;
+    // Beberapa paket yang diambil atau diberi resi sekaligus oleh satu kurir: satu kabar.
+    const groups = new Map<string, typeof rows>();
     for (const r of rows) {
       if (before.get(r.id) === r.status || r.updatedBy === be.user.name) continue;
+      if (r.status !== 'Di-pick up kurir' && r.status !== 'Resi diterima') continue;
+      const k = `${r.status}|${r.values.kurir ?? ''}`;
+      groups.set(k, [...(groups.get(k) ?? []), r]);
+    }
+    for (const list of groups.values()) {
+      const r = list[0];
       const what =
-        r.status === 'Di-pick up kurir'
-          ? `Paket ke ${r.values.tujuan} sudah di-pick up ${r.values.kurir || 'kurir'}`
-          : r.status === 'Resi diterima'
-            ? `Resi paket ke ${r.values.tujuan} masuk: ${r.values.resi}`
-            : '';
-      if (what) toast(what, { label: 'Lihat', run: () => go('pos', r.id) });
+        list.length > 1
+          ? r.status === 'Di-pick up kurir'
+            ? `${list.length} paket sudah di-pick up ${r.values.kurir || 'kurir'}`
+            : `Resi ${list.length} paket masuk dari ${r.values.kurir || 'kurir'}`
+          : r.status === 'Di-pick up kurir'
+            ? `Paket ke ${r.values.tujuan} sudah di-pick up ${r.values.kurir || 'kurir'}`
+            : `Resi paket ke ${r.values.tujuan} masuk: ${r.values.resi}`;
+      toast(what, { label: 'Lihat', run: () => go('pos', list.length === 1 ? r.id : undefined) });
     }
   }, [be.data.pos, be.loading, be.user, toast, go]);
 

@@ -1,14 +1,16 @@
 // Halaman publik pengiriman paket lewat Kantor Pos, tanpa login:
-//   #kirim-paket              formulir permohonan dari unit (dibuka dari QR)
-//   #kirim-paket/<id>.<token> halaman kurir: konfirmasi pick-up lalu kirim nomor dan foto resi
+//   #kirim-paket              formulir permohonan dari unit (dibuka dari QR), boleh beberapa paket
+//   #kirim-paket/<id>.<token>[,<id>.<token>…] halaman kurir untuk satu atau beberapa paket:
+//                             konfirmasi pick-up lalu kirim nomor dan foto resi
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Camera, Check, Loader2, Package, X } from 'lucide-react';
+import { Camera, Check, Loader2, Package, Plus, Trash2, X } from 'lucide-react';
 import { callFunction } from './backend';
 import { shrink } from './Attachments';
 import { OTHER, POS_STATUSES, UNITS } from './modules';
 import { fmtDate, readPref } from './util';
 
 interface Paket {
+  id: string;
   status: string;
   unit: string;
   pengirim: string;
@@ -17,12 +19,25 @@ interface Paket {
   isi?: string;
   kurir?: string;
   resi?: string;
+  biaya?: string;
   history: { status: string; at: string }[];
 }
 
-const parseRoute = () => {
-  const m = location.hash.match(/^#kirim-paket\/([0-9a-f-]+)\.([0-9a-f]+)$/i);
-  return m ? { id: m[1], token: m[2] } : null;
+interface Pair {
+  id: string;
+  token: string;
+}
+
+/** #kirim-paket/<id>.<token>,<id>.<token>… : satu tautan kurir untuk beberapa paket. */
+const parseRoute = (): Pair[] | null => {
+  const m = location.hash.match(/^#kirim-paket\/(.+)$/);
+  if (!m) return null;
+  const pairs = m[1]
+    .split(',')
+    .map((x) => x.match(/^([0-9a-f-]+)\.([0-9a-f]+)$/i))
+    .filter((x): x is RegExpMatchArray => !!x)
+    .map((x) => ({ id: x[1], token: x[2] }));
+  return pairs.length ? pairs : null;
 };
 
 export const isPosRoute = () => location.hash.startsWith('#kirim-paket');
@@ -51,25 +66,36 @@ export function PosPublic() {
           <span className="muted small block">Unit Dokumen · Balai Yasa Lahat</span>
         </span>
       </header>
-      {route ? <CourierPage {...route} /> : <RequestForm />}
+      {route ? <CourierPage items={route} /> : <RequestForm />}
     </div>
   );
 }
 
+interface Item {
+  tujuan: string;
+  alamat: string;
+  isi?: string;
+}
+
+const emptyItem = (): Item => ({ tujuan: '', alamat: '' });
+
 function RequestForm() {
   const [f, setF] = useState<Record<string, string>>({});
+  const [items, setItems] = useState<Item[]>([emptyItem()]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<Item[] | null>(null);
   const set = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
+  const setItem = (i: number, k: keyof Item, v: string) =>
+    setItems((l) => l.map((p, j) => (j === i ? { ...p, [k]: v } : p)));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setSending(true);
     setError('');
-    const r = await callFunction('kirim-paket', { action: 'ajukan', form: f, website: f.website });
+    const r = await callFunction('kirim-paket', { action: 'ajukan', form: f, paket: items, website: f.website });
     setSending(false);
-    if (r.ok) setDone(true);
+    if (r.ok) setDone(items);
     else setError(r.error);
   };
 
@@ -79,7 +105,17 @@ function RequestForm() {
         <span className="done-mark">
           <Check size={28} strokeWidth={2.6} />
         </span>
-        <h1>Permohonan terkirim.</h1>
+        <h1>{done.length > 1 ? `${done.length} paket terdaftar.` : 'Permohonan terkirim.'}</h1>
+        {done.length > 1 && (
+          <ol className="doc-list">
+            {done.map((p, i) => (
+              <li key={i}>
+                <b>{p.tujuan}</b>
+                {p.isi && <span className="muted small block">{p.isi}</span>}
+              </li>
+            ))}
+          </ol>
+        )}
         <p className="muted">
           Silakan serahkan paketnya ke Unit Dokumen. WA dikirim ke {f.kontak} saat paket kami terima, lalu lagi
           berisi nomor resi setelah paket dikirim.
@@ -87,8 +123,8 @@ function RequestForm() {
         <button
           className="btn"
           onClick={() => {
-            setDone(false);
-            setF((x) => ({ unit: x.unit ?? '', unitLainnya: x.unitLainnya ?? '', pengirim: x.pengirim ?? '', kontak: x.kontak ?? '' }));
+            setDone(null);
+            setItems([emptyItem()]);
           }}
         >
           Kirim paket lain
@@ -145,37 +181,65 @@ function RequestForm() {
             onChange={(e) => set('kontak', e.target.value)}
           />
         </label>
-        <label className="full">
-          <span>
-            Penerima & kota tujuan<em className="req">*</em>
-          </span>
-          <input
-            required
-            placeholder="mis. PT INKA (Persero), Madiun"
-            value={f.tujuan ?? ''}
-            onChange={(e) => set('tujuan', e.target.value)}
-          />
-        </label>
-        <label className="full">
-          <span>
-            Alamat lengkap tujuan<em className="req">*</em>
-          </span>
-          <textarea
-            required
-            rows={3}
-            placeholder="Jalan, nomor, kelurahan, kecamatan, kode pos, dan nomor telepon penerima bila ada"
-            value={f.alamat ?? ''}
-            onChange={(e) => set('alamat', e.target.value)}
-          />
-        </label>
-        <label className="full">
-          <span>Isi paket</span>
-          <input
-            placeholder="mis. Dokumen kontrak asli, 1 map"
-            value={f.isi ?? ''}
-            onChange={(e) => set('isi', e.target.value)}
-          />
-        </label>
+
+        <div className="full berkas">
+          <b className="berkas-title">Paket yang dikirim</b>
+          {items.map((p, i) => (
+            <div key={i} className="berkas-item">
+              <span className="berkas-num">{i + 1}</span>
+              <div className="berkas-fields">
+                <label className="full">
+                  <span>
+                    Penerima & kota tujuan<em className="req">*</em>
+                  </span>
+                  <input
+                    required
+                    placeholder="mis. PT INKA (Persero), Madiun"
+                    value={p.tujuan}
+                    onChange={(e) => setItem(i, 'tujuan', e.target.value)}
+                  />
+                </label>
+                <label className="full">
+                  <span>
+                    Alamat lengkap tujuan<em className="req">*</em>
+                  </span>
+                  <textarea
+                    required
+                    rows={3}
+                    placeholder="Jalan, nomor, kelurahan, kecamatan, kode pos, dan nomor telepon penerima bila ada"
+                    value={p.alamat}
+                    onChange={(e) => setItem(i, 'alamat', e.target.value)}
+                  />
+                </label>
+                <label className="full">
+                  <span>Isi paket</span>
+                  <input
+                    placeholder="mis. Dokumen kontrak asli, 1 map"
+                    value={p.isi ?? ''}
+                    onChange={(e) => setItem(i, 'isi', e.target.value)}
+                  />
+                </label>
+              </div>
+              {items.length > 1 && (
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label={`Hapus paket ${i + 1}`}
+                  title="Hapus paket ini"
+                  onClick={() => setItems((l) => l.filter((_, j) => j !== i))}
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
+          ))}
+          {items.length < 20 && (
+            <button type="button" className="btn" onClick={() => setItems((l) => [...l, emptyItem()])}>
+              <Plus size={15} /> Tambah paket
+            </button>
+          )}
+        </div>
+
         <label className="full">
           <span>Catatan</span>
           <textarea rows={2} value={f.catatan ?? ''} onChange={(e) => set('catatan', e.target.value)} />
@@ -191,20 +255,13 @@ function RequestForm() {
         />
         {error && <p className="notice error full">{error}</p>}
         <button className="pill-btn big block full" disabled={sending}>
-          {sending ? <Loader2 size={18} className="spin" /> : null} Kirim permohonan
+          {sending ? <Loader2 size={18} className="spin" /> : null}
+          {items.length > 1 ? `Kirim ${items.length} paket` : 'Kirim permohonan'}
         </button>
       </form>
     </main>
   );
 }
-
-// Tahap yang terlihat kurir: dari saat paket siap di-pick up.
-const COURIER_STEPS = POS_STATUSES.slice(POS_STATUSES.indexOf('Proses pengiriman'), POS_STATUSES.indexOf('Resi diterima') + 1);
-const STEP_LABEL: Record<string, string> = {
-  'Proses pengiriman': 'Siap di-pick up',
-  'Di-pick up kurir': 'Sudah diambil',
-  'Resi diterima': 'Resi terkirim',
-};
 
 async function toBase64(b: Blob) {
   const buf = new Uint8Array(await b.arrayBuffer());
@@ -213,29 +270,32 @@ async function toBase64(b: Blob) {
   return btoa(s);
 }
 
-function CourierPage({ id, token }: { id: string; token: string }) {
-  const [p, setP] = useState<Paket | null>(null);
+const idx = (s: string) => POS_STATUSES.indexOf(s);
+const DONE_AT = idx('Resi diterima');
+const READY_AT = idx('Proses pengiriman');
+
+function CourierPage({ items }: { items: Pair[] }) {
+  const [list, setList] = useState<Paket[] | null>(null);
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
-  const [resi, setResi] = useState('');
-  const [biaya, setBiaya] = useState('');
+  const [resi, setResi] = useState<Record<string, { resi: string; biaya: string }>>({});
   const [foto, setFoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [editing, setEditing] = useState(false);
   const camRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    callFunction('kirim-paket', { action: 'lihat', id, token }).then((r) =>
-      r.ok ? setP(r.data.paket as Paket) : setError(r.error),
+    callFunction('kirim-paket', { action: 'lihat', items }).then((r) =>
+      r.ok ? setList(r.data.paket as Paket[]) : setError(r.error),
     );
-  }, [id, token]);
+  }, [items]);
   useEffect(() => () => void (foto && URL.revokeObjectURL(foto.url)), [foto]);
 
   const call = async (body: Record<string, unknown>) => {
     setSending(true);
     setError('');
-    const r = await callFunction('kirim-paket', { id, token, ...body });
+    const r = await callFunction('kirim-paket', { items, ...body });
     setSending(false);
-    if (r.data?.paket) setP(r.data.paket as Paket);
+    if (r.data?.paket) setList(r.data.paket as Paket[]);
     if (!r.ok) setError(r.error);
     return r.ok;
   };
@@ -246,17 +306,7 @@ function CourierPage({ id, token }: { id: string; token: string }) {
     setFoto({ blob, url: URL.createObjectURL(blob) });
   };
 
-  const sendResi = async (e: FormEvent) => {
-    e.preventDefault();
-    const body: Record<string, unknown> = { action: 'resi', resi, biaya };
-    if (foto) body.foto = { data: await toBase64(foto.blob), type: foto.blob.type || 'image/jpeg' };
-    if (await call(body)) {
-      setFoto(null);
-      setEditing(false);
-    }
-  };
-
-  if (!p)
+  if (!list)
     return (
       <main className="public-card">
         {error ? (
@@ -272,84 +322,108 @@ function CourierPage({ id, token }: { id: string; token: string }) {
       </main>
     );
 
-  const idx = POS_STATUSES.indexOf(p.status);
-  const cur = COURIER_STEPS.indexOf(p.status);
-  const finished = idx >= POS_STATUSES.indexOf('Resi diterima');
-  const canResi = idx >= POS_STATUSES.indexOf('Proses pengiriman') && (!finished || editing);
-  const at = (s: string) => [...p.history].reverse().find((h) => h.status === s)?.at;
+  const many = list.length > 1;
+  const ready = list.filter((p) => p.status === 'Proses pengiriman');
+  const picked = list.filter((p) => idx(p.status) > READY_AT && idx(p.status) < DONE_AT);
+  const finished = list.filter((p) => idx(p.status) >= DONE_AT);
+  const allDone = finished.length === list.length;
+  const notYet = list.filter((p) => idx(p.status) < READY_AT);
+  // Paket yang resinya bisa diisi: sudah diambil, atau sudah ada resi dan sedang diperbaiki.
+  const toFill = list.filter((p) => picked.includes(p) || (editing && p.status === 'Resi diterima'));
+  const field = (p: Paket) => resi[p.id] ?? { resi: editing ? p.resi ?? '' : '', biaya: editing ? p.biaya ?? '' : '' };
+  const setField = (p: Paket, k: 'resi' | 'biaya', v: string) => setResi((x) => ({ ...x, [p.id]: { ...field(p), [k]: v } }));
+
+  const sendResi = async (e: FormEvent) => {
+    e.preventDefault();
+    const pairs = new Map(items.map((i) => [i.id, i.token]));
+    const body: Record<string, unknown> = {
+      action: 'resi',
+      items: toFill.map((p) => ({ id: p.id, token: pairs.get(p.id), ...field(p) })),
+    };
+    if (foto) body.foto = { data: await toBase64(foto.blob), type: foto.blob.type || 'image/jpeg' };
+    if (await call(body)) {
+      setFoto(null);
+      setEditing(false);
+      setResi({});
+    }
+  };
+
+  const at = (p: Paket, s: string) => [...p.history].reverse().find((h) => h.status === s)?.at;
+  const stepOf = (p: Paket) =>
+    idx(p.status) >= DONE_AT ? `Resi ${p.resi}` : idx(p.status) > READY_AT ? 'Sudah diambil' : idx(p.status) === READY_AT ? 'Siap di-pick up' : 'Belum siap';
 
   return (
     <main className="public-card">
-      <h1>Paket ke {p.tujuan}.</h1>
-      <p className="muted lead">
-        {p.isi ? `${p.isi} · ` : ''}dari {p.pengirim} ({p.unit})
-      </p>
-      {p.alamat && (
-        <div className="busy">
-          <b>Alamat tujuan</b>
-          <p className="pre-line">{p.alamat}</p>
-        </div>
+      <h1>{many ? `${list.length} paket untuk dikirim.` : `Paket ke ${list[0].tujuan}.`}</h1>
+      {!many && (
+        <p className="muted lead">
+          {list[0].isi ? `${list[0].isi} · ` : ''}dari {list[0].pengirim} ({list[0].unit})
+        </p>
       )}
 
-      {cur < 0 && !finished ? (
-        <p className="muted">Paket belum siap di-pick up. Unit Dokumen akan mengirim WA saat paket siap.</p>
-      ) : (
-        <ol className="track">
-          {COURIER_STEPS.map((s, i) => {
-            const past = finished || i < cur;
-            return (
-              <li key={s} className={past ? 'past' : i === cur ? 'on' : ''}>
-                <span className="dot">{past ? <Check size={13} strokeWidth={3} /> : i + 1}</span>
-                <span className="grow">
-                  <b>{STEP_LABEL[s]}</b>
-                  {at(s) && (past || i === cur) && <span className="muted small block">{fmtDate(at(s)!.slice(0, 10))}</span>}
+      <ol className="paket-list">
+        {list.map((p, i) => (
+          <li key={p.id} className={idx(p.status) >= DONE_AT ? 'done' : ''}>
+            {many && <span className="berkas-num">{i + 1}</span>}
+            <div className="grow">
+              {many && <b className="block">{p.tujuan}</b>}
+              {many && (
+                <span className="muted small block">
+                  {p.isi ? `${p.isi} · ` : ''}dari {p.pengirim} ({p.unit})
                 </span>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+              )}
+              {p.alamat && <p className="pre-line small">{p.alamat}</p>}
+              <span className={'pill-step ' + (idx(p.status) >= DONE_AT ? 'ok' : idx(p.status) > READY_AT ? 'on' : '')}>
+                {idx(p.status) >= DONE_AT ? <Check size={12} strokeWidth={3} /> : null}
+                {stepOf(p)}
+                {at(p, p.status) && idx(p.status) >= READY_AT ? ` · ${fmtDate(at(p, p.status)!.slice(0, 10))}` : ''}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
 
+      {notYet.length === list.length && (
+        <p className="muted">Paket belum siap di-pick up. Unit Dokumen akan mengirim WA saat paket siap.</p>
+      )}
       {error && <p className="notice error">{error}</p>}
 
-      {p.status === 'Proses pengiriman' && (
-        <button className="pill-btn big block" disabled={sending} onClick={() => call({ action: 'pickup' })}>
-          {sending ? <Loader2 size={18} className="spin" /> : null} Paket sudah saya ambil
-        </button>
-      )}
-
-      {finished && !editing && (
+      {ready.length > 0 && (
         <>
-          <p className="muted">
-            Nomor resi <b className="text">{p.resi}</b> sudah kami terima. Terima kasih.
-          </p>
-          {p.status === 'Resi diterima' && (
-            <button className="btn" onClick={() => (setResi(p.resi ?? ''), setEditing(true))}>
-              Perbaiki nomor resi
-            </button>
-          )}
+          <button className="pill-btn big block" disabled={sending} onClick={() => call({ action: 'pickup' })}>
+            {sending ? <Loader2 size={18} className="spin" /> : null}
+            {ready.length > 1 ? `${ready.length} paket sudah saya ambil` : 'Paket sudah saya ambil'}
+          </button>
+          <p className="muted small">Setelah paket dikirim di Kantor Pos, buka lagi tautan ini untuk mengisi nomor resi.</p>
         </>
       )}
 
-      {canResi && p.status !== 'Proses pengiriman' && (
+      {toFill.length > 0 && (
         <form className="form-grid" onSubmit={sendResi}>
-          <label className="full">
-            <span>
-              Nomor resi<em className="req">*</em>
-            </span>
-            <input
-              required
-              autoComplete="off"
-              autoCapitalize="characters"
-              placeholder="mis. P2409270123456"
-              value={resi}
-              onChange={(e) => setResi(e.target.value)}
-            />
-          </label>
-          <label className="full">
-            <span>Biaya kirim (Rp)</span>
-            <input inputMode="numeric" placeholder="mis. 25000" value={biaya} onChange={(e) => setBiaya(e.target.value)} />
-          </label>
+          <b className="full">{toFill.length > 1 ? 'Nomor resi tiap paket' : 'Nomor resi'}</b>
+          {toFill.map((p) => (
+            <div key={p.id} className="full resi-row">
+              {many && <span className="small muted block">{p.tujuan}</span>}
+              <div className="resi-inputs">
+                <input
+                  required
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  aria-label={`Nomor resi ${p.tujuan}`}
+                  placeholder="Nomor resi, mis. P2409270123456"
+                  value={field(p).resi}
+                  onChange={(e) => setField(p, 'resi', e.target.value)}
+                />
+                <input
+                  inputMode="numeric"
+                  aria-label={`Biaya kirim ${p.tujuan}`}
+                  placeholder="Biaya (Rp)"
+                  value={field(p).biaya}
+                  onChange={(e) => setField(p, 'biaya', e.target.value)}
+                />
+              </div>
+            </div>
+          ))}
           <div className="full foto-resi">
             {foto ? (
               <div className="foto-prev">
@@ -360,7 +434,7 @@ function CourierPage({ id, token }: { id: string; token: string }) {
               </div>
             ) : (
               <button type="button" className="btn" onClick={() => camRef.current?.click()}>
-                <Camera size={16} /> Foto resi
+                <Camera size={16} /> Foto resi{many ? ' (boleh satu untuk semua)' : ''}
               </button>
             )}
             <input
@@ -377,8 +451,16 @@ function CourierPage({ id, token }: { id: string; token: string }) {
           </button>
         </form>
       )}
-      {p.status === 'Proses pengiriman' && (
-        <p className="muted small">Setelah paket dikirim di Kantor Pos, buka lagi tautan ini untuk mengisi nomor resi.</p>
+
+      {allDone && !editing && (
+        <>
+          <p className="muted">Nomor resi sudah kami terima. Terima kasih.</p>
+          {list.some((p) => p.status === 'Resi diterima') && (
+            <button className="btn" onClick={() => setEditing(true)}>
+              Perbaiki nomor resi
+            </button>
+          )}
+        </>
       )}
     </main>
   );

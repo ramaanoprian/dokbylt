@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js';
-import { MODULES, moduleById, type ModuleId } from './modules';
+import { MODULES, moduleById, notifyKey, type ModuleId } from './modules';
 import { waNumber } from './util';
 
 export interface HistoryEntry {
@@ -79,7 +79,7 @@ const supabase: SupabaseClient | null = url && key ? createClient(url, key) : nu
 
 export type NotifyResult = { sent: true; target: string } | { sent: false; reason: string };
 
-/** false: tidak perlu WA. "instant": peminjam drone atau pemohon/kurir paket, langsung. `{ stage }`: PIC dokumen, digabung per nomor. */
+/** false: tidak perlu WA. "instant": peminjam drone, langsung. `{ stage }`: PIC dokumen atau pemohon/kurir paket, digabung per nomor. */
 export type NotifyKind = false | 'instant' | { stage: string };
 
 function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord): NotifyKind {
@@ -87,7 +87,7 @@ function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord): NotifyKi
   if (!def) return false;
   // Nomor tujuan (peminjam, pemohon, atau kurir) diperiksa oleh fungsi servernya.
   if (def.notifyOn) return def.notifyOn.includes(rec.status) && prev?.status !== rec.status ? 'instant' : false;
-  if (!def.notifyStages || !waNumber(rec.values.kontakPic)) return false;
+  if (!def.notifyStages) return false;
   // Data baru hanya dikabari bila memang baru (bukan data terhapus yang dikembalikan).
   if (!prev && rec.history.length > 1) return false;
   // Kabari tahap tertinggi yang baru dilewati, juga bila staf melompati tahap itu.
@@ -95,7 +95,7 @@ function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord): NotifyKi
   const now = idx(rec.status);
   const before = prev ? idx(prev.status) : -1;
   const stage = [...def.notifyStages].reverse().find((s) => before < idx(s) && idx(s) <= now);
-  return stage ? { stage } : false;
+  return stage && waNumber(rec.values[notifyKey(def, stage)]) ? { stage } : false;
 }
 
 // Token sesi disimpan di sini agar WA yang masih antre tetap bisa dikirim saat halaman ditutup.
@@ -105,24 +105,20 @@ supabase?.auth.onAuthStateChange((_e, s) => {
 });
 
 /**
- * Minta server mengirim WA ke PIC unit lewat fungsi "kabari-pic". Beberapa dokumen untuk nomor
- * yang sama digabung server menjadi satu pesan berisi daftar.
+ * Minta server mengirim WA ke PIC unit (fungsi "kabari-pic") atau ke pemohon/kurir paket (fungsi
+ * "kirim-paket"). Beberapa data untuk nomor yang sama digabung server menjadi satu pesan berisi daftar.
  */
-export async function sendNotify(ids: string[], stage: string, keepalive = false): Promise<NotifyResult> {
-  const r = await callFunction('kabari-pic', { ids, stage }, keepalive);
+export async function sendNotify(mod: ModuleId, ids: string[], stage: string, keepalive = false): Promise<NotifyResult> {
+  const r =
+    mod === 'pos'
+      ? await callFunction('kirim-paket', { action: 'kabari', ids, stage }, keepalive)
+      : await callFunction('kabari-pic', { ids, stage }, keepalive);
   return r.ok ? { sent: true, target: String(r.data.target ?? '') } : { sent: false, reason: r.error };
 }
 
-const INSTANT_FN: Partial<Record<ModuleId, string>> = { drone: 'pinjam-drone', pos: 'kirim-paket' };
-
-/**
- * Kabari peminjam drone, atau pemohon/kurir paket, sesuai tahapnya sekarang (dipanggil setelah
- * staf memindah tahap).
- */
-export async function sendInstantNotify(mod: ModuleId, id: string): Promise<NotifyResult> {
-  const fn = INSTANT_FN[mod];
-  if (!fn) return { sent: false, reason: 'menu ini tidak mengirim WA' };
-  const r = await callFunction(fn, { action: 'kabari', id });
+/** Kabari peminjam drone sesuai tahapnya sekarang (dipanggil setelah staf memindah tahap). */
+export async function sendDroneNotify(id: string): Promise<NotifyResult> {
+  const r = await callFunction('pinjam-drone', { action: 'kabari', id });
   return r.ok ? { sent: true, target: String(r.data.target ?? '') } : { sent: false, reason: r.error };
 }
 

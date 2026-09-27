@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, Columns3, List, Paperclip, Plus, Search } from 'lucide-react';
 import type { ModuleDef } from './modules';
-import { attachmentsOf, sendInstantNotify, type DocRecord, type NotifyKind } from './backend';
+import { attachmentsOf, sendDroneNotify, type DocRecord, type NotifyKind } from './backend';
 import { cancelNotify, queueNotify } from './notifyQueue';
 import { DataMenu } from './DataMenu';
 import { FormQrButton, QR_FORMS } from './FormQr';
@@ -126,15 +126,10 @@ export function ModulePage({
   // WA ke PIC tidak langsung dikirim: masuk antrean agar beberapa dokumen digabung jadi satu pesan.
   const saveAndNotify = (r: DocRecord, prev?: DocRecord) =>
     Promise.resolve(onSave(r, prev)).then(async (notify) => {
-      if (notify && typeof notify === 'object') queueNotify(r, notify.stage);
+      if (notify && typeof notify === 'object') queueNotify(mod, r, notify.stage);
       else if (notify === 'instant') {
-        const who =
-          mod.id === 'pos'
-            ? r.status === 'Proses pengiriman'
-              ? `kurir ${r.values.kurir || ''}`.trim()
-              : r.values.pengirim || 'pemohon'
-            : r.values.pic || 'peminjam';
-        const res = await sendInstantNotify(mod.id, r.id);
+        const who = r.values.pic || 'peminjam';
+        const res = await sendDroneNotify(r.id);
         if (res.sent) toast(`WA terkirim ke ${who}`);
         else toast(`WA ke ${who} belum terkirim (${res.reason})`);
       }

@@ -874,6 +874,16 @@ tr:hover td.actions .btn, td.actions .btn:focus-visible { opacity: 1; }
 .pre-line { white-space: pre-line; margin: 6px 0 0; }
 .public-card b.text { color: var(--text); }
 .foto-resi { display: flex; }
+.paket-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 10px; }
+.paket-list li { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; background: var(--fill-2); }
+.paket-list .berkas-num { margin-top: 0; }
+.paket-list .pre-line { color: var(--text-2); }
+.pill-step { display: inline-flex; align-items: center; gap: 5px; margin-top: 10px; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 500; background: var(--fill); color: var(--muted); }
+.pill-step.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.pill-step.ok { background: color-mix(in srgb, #34c759 18%, transparent); color: #1f8f3f; }
+:root[data-theme='dark'] .pill-step.ok { color: #30d158; }
+.resi-row { display: flex; flex-direction: column; gap: 6px; }
+.resi-inputs { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .foto-prev { position: relative; }
 .foto-prev img { display: block; max-width: 100%; max-height: 260px; border-radius: 14px; }
 .foto-prev .icon-btn { position: absolute; top: 8px; right: 8px; background: var(--surface); box-shadow: var(--card-shadow); }
