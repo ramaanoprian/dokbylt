@@ -36,7 +36,7 @@ export interface ModuleDef {
   notifyStatus?: string;
   /** Tahap awal sebelum diproses (didaftarkan unit sendiri lewat formulir publik). */
   preStatus?: string;
-  /** Tahap-tahap yang langsung memicu WA ke peminjam (tanpa digabung). */
+  /** Tahap-tahap yang langsung memicu WA lewat fungsi server menu ini (peminjam drone, pemohon atau kurir paket). */
   notifyOn?: string[];
 }
 
@@ -46,6 +46,14 @@ export const UNITS = ['Rencana', 'Logistik', 'Keuangan', 'SDM', 'Dokumen', 'Lain
 /** Unit yang biasa meminjam drone. */
 export const DRONE_UNITS = ['SDM', 'Quality Control', 'Fasilitas', 'Rencana', 'Logistik', 'Keuangan', 'Lainnya'];
 export const DRONE_STATUSES = ['Diajukan', 'Disetujui', 'Dipinjam', 'Dikembalikan'];
+export const POS_STATUSES = [
+  'Didaftarkan unit',
+  'Diterima dari unit',
+  'Proses pengiriman',
+  'Di-pick up kurir',
+  'Resi diterima',
+  'Resi dikirim ke user',
+];
 
 /** Pilihan yang mewajibkan keterangan tambahan. */
 export const OTHER = 'Lainnya';
@@ -156,11 +164,13 @@ export const MODULES: ModuleDef[] = [
   },
   {
     id: 'pos',
+    preStatus: 'Didaftarkan unit',
+    notifyOn: ['Diterima dari unit', 'Proses pengiriman', 'Resi dikirim ke user'],
     dueDays: 2,
     title: 'Pengiriman via Kantor Pos',
     menu: 'Kantor Pos',
     description:
-      'Paket/dokumen dari unit untuk dikirim keluar daerah: diserahkan ke kantor pos, resi diterima, lalu resi dikirim ke pengirim.',
+      'Paket dari unit untuk dikirim keluar daerah: didaftarkan pemohon lewat QR, diterima, diambil kurir, kurir mengunggah resi, lalu resi dikirim ke pemohon.',
     icon: 'pos',
     itemName: 'kiriman',
     dateField: 'tanggal',
@@ -168,16 +178,31 @@ export const MODULES: ModuleDef[] = [
       { key: 'tanggal', label: 'Tanggal diterima dari unit', type: 'date', required: true, inTable: true },
       tenggat('Batas paket harus sudah dikirim'),
       { key: 'unit', label: 'Unit pengirim', type: 'select', options: UNITS, required: true, inTable: true },
-      { key: 'pengirim', label: 'Nama pengirim (user)', type: 'text', required: true, inTable: true },
-      { key: 'kontak', label: 'Kontak pengirim (WA/email)', type: 'text' },
-      { key: 'tujuan', label: 'Tujuan (nama & kota)', type: 'text', required: true, inTable: true },
-      { key: 'isi', label: 'Isi kiriman', type: 'text' },
+      { key: 'pengirim', label: 'Nama pemohon', type: 'text', required: true, inTable: true },
+      {
+        key: 'kontak',
+        label: 'No. WA pemohon',
+        type: 'text',
+        placeholder: '08…',
+        hint: 'Pemohon dikabari lewat WA saat paket diterima dan saat resi dikirim',
+      },
+      { key: 'tujuan', label: 'Penerima & kota tujuan', type: 'text', required: true, inTable: true },
+      { key: 'alamat', label: 'Alamat lengkap tujuan', type: 'textarea' },
+      { key: 'isi', label: 'Isi paket', type: 'text' },
+      { key: 'kurir', label: 'Nama kurir pick-up', type: 'text', inTable: true },
+      {
+        key: 'kontakKurir',
+        label: 'No. WA kurir',
+        type: 'text',
+        placeholder: '08…',
+        hint: 'Kurir dapat WA berisi tautan untuk konfirmasi pick-up dan unggah resi',
+      },
       { key: 'resi', label: 'Nomor resi', type: 'text', inTable: true },
       { key: 'biaya', label: 'Biaya (Rp)', type: 'number' },
       { key: 'catatan', label: 'Catatan', type: 'textarea' },
     ],
-    statuses: ['Diterima dari unit', 'Diserahkan ke pos', 'Resi diterima', 'Resi dikirim ke user'],
-    requiredForStatus: { 'Resi diterima': ['resi'] },
+    statuses: POS_STATUSES,
+    requiredForStatus: { 'Proses pengiriman': ['kurir', 'kontakKurir'], 'Resi diterima': ['resi'] },
   },
   {
     id: 'multimedia',

@@ -19,7 +19,7 @@ interface Props {
 const MAX_SIDE = 1800;
 
 /** Foto dari kamera HP bisa 5–10 MB; perkecil dulu supaya hemat kuota penyimpanan. */
-async function shrink(file: File): Promise<Blob> {
+export async function shrink(file: File): Promise<Blob> {
   if (!file.type.startsWith('image/') || file.type === 'image/gif') return file;
   try {
     const bmp = await createImageBitmap(file);

@@ -106,7 +106,7 @@ export default function App() {
     );
   }, [reminders, be.loading, be.user, toast, go]);
 
-  // Pengajuan dari formulir publik (pinjam drone, daftar dokumen TTD EVP) masuk lewat
+  // Pengajuan dari formulir publik (pinjam drone, daftar dokumen TTD EVP, kirim paket) masuk lewat
   // sinkronisasi: beri tahu staf. Beberapa dokumen dari satu pengantar digabung jadi satu kabar.
   const seenPublic = useRef<Set<string> | null>(null);
   useEffect(() => {
@@ -114,8 +114,9 @@ export default function App() {
     const incoming = [
       ...(be.data.drone ?? []).filter((r) => r.status === 'Diajukan').map((r) => ({ r, mod: 'drone' as const })),
       ...(be.data.evp ?? []).filter((r) => r.status === 'Didaftarkan unit').map((r) => ({ r, mod: 'evp' as const })),
+      ...(be.data.pos ?? []).filter((r) => r.status === 'Didaftarkan unit').map((r) => ({ r, mod: 'pos' as const })),
     ];
-    const all = [...(be.data.drone ?? []), ...(be.data.evp ?? [])];
+    const all = [...(be.data.drone ?? []), ...(be.data.evp ?? []), ...(be.data.pos ?? [])];
     if (!seenPublic.current) {
       seenPublic.current = new Set(all.map((r) => r.id));
       return;
@@ -129,15 +130,37 @@ export default function App() {
     }
     for (const list of groups.values()) {
       const { r, mod } = list[0];
-      const who = `${r.values.pic || 'unit'} (${r.values.unitLainnya || r.values.unit || '–'})`;
+      const who = `${r.values.pic || r.values.pengirim || 'unit'} (${r.values.unitLainnya || r.values.unit || '–'})`;
       toast(
         mod === 'drone'
           ? `Pengajuan pinjam drone baru dari ${who}`
-          : `${list.length} dokumen TTD EVP didaftarkan oleh ${who}`,
+          : mod === 'pos'
+            ? `Permohonan kirim paket dari ${who}`
+            : `${list.length} dokumen TTD EVP didaftarkan oleh ${who}`,
         { label: 'Lihat', run: () => go(mod, list.length === 1 ? r.id : undefined) },
       );
     }
-  }, [be.data.drone, be.data.evp, be.loading, be.user, toast, go]);
+  }, [be.data.drone, be.data.evp, be.data.pos, be.loading, be.user, toast, go]);
+
+  // Kurir paket bekerja lewat tautan WA tanpa login: kabari staf saat paket diambil dan resi masuk.
+  const posStatus = useRef<Map<string, string> | null>(null);
+  useEffect(() => {
+    if (be.loading || !be.user) return;
+    const rows = be.data.pos ?? [];
+    const before = posStatus.current;
+    posStatus.current = new Map(rows.map((r) => [r.id, r.status]));
+    if (!before) return;
+    for (const r of rows) {
+      if (before.get(r.id) === r.status || r.updatedBy === be.user.name) continue;
+      const what =
+        r.status === 'Di-pick up kurir'
+          ? `Paket ke ${r.values.tujuan} sudah di-pick up ${r.values.kurir || 'kurir'}`
+          : r.status === 'Resi diterima'
+            ? `Resi paket ke ${r.values.tujuan} masuk: ${r.values.resi}`
+            : '';
+      if (what) toast(what, { label: 'Lihat', run: () => go('pos', r.id) });
+    }
+  }, [be.data.pos, be.loading, be.user, toast, go]);
 
   if (!be.authReady) return <div className="splash" />;
   if (!be.user) return <LoginPage onSignIn={be.signIn} />;

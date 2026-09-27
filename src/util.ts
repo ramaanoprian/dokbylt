@@ -175,12 +175,13 @@ export function notifyUrl(docs: Record<string, string>[], stage = '') {
   return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(docs, stage))}` : '';
 }
 
+/** Sama dengan pesan tahap "Resi dikirim ke user" di supabase/functions/kirim-paket. */
 export function resiMessage(v: Record<string, string>) {
   return [
     `Halo ${v.pengirim || 'Bapak/Ibu'},`,
     '',
-    `Kiriman${v.isi ? ` "${v.isi}"` : ''} untuk ${v.tujuan || 'tujuan'} sudah dikirim lewat Kantor Pos.`,
-    `Nomor resi: *${v.resi}*`,
+    `${v.isi ? `Paket "${v.isi}"` : 'Paket'} untuk ${v.tujuan || 'tujuan'} sudah dikirim lewat Kantor Pos.`,
+    `Nomor resi: *${v.resi || '–'}*`,
     '',
     'Status pengiriman bisa dicek di https://www.posindonesia.co.id/id/tracking',
     '',
