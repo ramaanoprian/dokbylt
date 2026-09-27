@@ -154,7 +154,7 @@ export default function App() {
     const groups = new Map<string, typeof rows>();
     for (const r of rows) {
       if (before.get(r.id) === r.status || r.updatedBy === be.user.name) continue;
-      if (r.status !== 'Di-pick up kurir' && r.status !== 'Resi diterima') continue;
+      if (!['Di-pick up kurir', 'Resi diterima', 'Resi dikirim ke user'].includes(r.status)) continue;
       const k = `${r.status}|${r.values.kurir ?? ''}`;
       groups.set(k, [...(groups.get(k) ?? []), r]);
     }
@@ -164,10 +164,10 @@ export default function App() {
         list.length > 1
           ? r.status === 'Di-pick up kurir'
             ? `${list.length} paket sudah di-pick up ${r.values.kurir || 'kurir'}`
-            : `Resi ${list.length} paket masuk dari ${r.values.kurir || 'kurir'}`
+            : `Resi ${list.length} paket masuk dari ${r.values.kurir || 'kurir'}${r.status === 'Resi dikirim ke user' ? ' dan sudah diteruskan ke pemohon' : ''}`
           : r.status === 'Di-pick up kurir'
             ? `Paket ke ${r.values.tujuan} sudah di-pick up ${r.values.kurir || 'kurir'}`
-            : `Resi paket ke ${r.values.tujuan} masuk: ${r.values.resi}`;
+            : `Resi paket ke ${r.values.tujuan} masuk: ${r.values.resi}${r.status === 'Resi dikirim ke user' ? ', sudah diteruskan ke pemohon' : ''}`;
       toast(what, { label: 'Lihat', run: () => go('pos', list.length === 1 ? r.id : undefined) });
     }
   }, [be.data.pos, be.loading, be.user, toast, go]);

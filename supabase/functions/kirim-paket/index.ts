@@ -4,7 +4,7 @@
 //   ajukan  pemohon dari unit mengisi formulir (#kirim-paket, dibuka dari QR), boleh beberapa paket
 //   lihat   kurir membuka tautan pribadinya dari WA (butuh token; satu tautan bisa beberapa paket)
 //   pickup  kurir menandai paket sudah diambil
-//   resi    kurir mengisi nomor resi (dan foto resi bila ada)
+//   resi    kurir mengisi nomor resi (dan foto resi bila ada); resi dan foto langsung diteruskan ke pemohon
 // Dengan login staf:
 //   kabari  kirim WA untuk beberapa paket sekaligus, digabung per nomor: ke pemohon saat paket diterima, ke kurir saat
 //           proses pengiriman, dan resi ke pemohon saat tahap "Resi dikirim ke user"
@@ -73,16 +73,45 @@ const paketOf = (v: Values) => (v.isi ? `paket "${v.isi}"` : 'paket');
 const PaketOf = (v: Values) => (v.isi ? `Paket "${v.isi}"` : 'Paket');
 const MAX_PAKET = 20;
 
-async function sendWa(target: string, text: string) {
+/**
+ * Kirim WA lewat Fonnte; kosong bila berhasil, alasan gagal bila tidak. Dengan `image`, gambar
+ * ikut dikirim dan teks menjadi keterangannya. Paket Fonnte yang tidak mendukung lampiran
+ * menolaknya, jadi pesan dikirim ulang sebagai teks dengan tautan ke gambar.
+ */
+async function sendWa(target: string, text: string, image = ''): Promise<string> {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return 'FONNTE_TOKEN belum diatur';
   const body = new FormData();
   body.set('target', target);
   body.set('message', text);
   body.set('countryCode', '62');
+  if (image) body.set('url', image);
   const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: token }, body });
   const out = await res.json().catch(() => ({}));
-  return !res.ok || out.status === false ? out.reason || `Fonnte menolak (${res.status})` : '';
+  const fail = !res.ok || out.status === false ? out.reason || `Fonnte menolak (${res.status})` : '';
+  if (fail && image) return sendWa(target, `${text}\n\nFoto resi: ${image}`);
+  return fail;
+}
+
+interface Att {
+  path: string;
+  name: string;
+}
+
+/** Tautan sementara (30 hari) ke foto resi terbaru dari paket-paket ini, bila ada. */
+async function resiPhoto(recs: Rec[]) {
+  let latest: Att | null = null;
+  for (const r of recs) {
+    try {
+      const list = JSON.parse(r.values.lampiran || '[]') as Att[];
+      for (const a of list) if (a?.name?.startsWith('Foto resi') && (!latest || a.path > latest.path)) latest = a;
+    } catch {
+      // lampiran rusak: lewati
+    }
+  }
+  if (!latest) return '';
+  const { data } = await admin.storage.from(BUCKET).createSignedUrl(latest.path, 30 * 24 * 3600);
+  return data?.signedUrl ?? '';
 }
 
 async function tellStaff(text: string) {
@@ -108,6 +137,7 @@ const STATUSES = [
   'Resi dikirim ke user',
 ];
 const COURIER_STAGES = ['Proses pengiriman', 'Di-pick up kurir'];
+const SENT = 'Resi dikirim ke user';
 /** Field nomor WA tujuan untuk tahap itu. */
 const targetKey = (stage: string) => (COURIER_STAGES.includes(stage) ? 'kontakKurir' : 'kontak');
 const nameOf = (v: Values, stage: string) => (COURIER_STAGES.includes(stage) ? v.kurir : v.pengirim);
@@ -194,15 +224,21 @@ async function notify(recs: Rec[], stage: string) {
   if (!groups.size)
     return { error: COURIER_STAGES.includes(stage) ? 'Nomor WA kurir belum diisi' : 'Nomor WA pemohon belum diisi' };
   const sent: string[] = [];
+  const sentIds: string[] = [];
   let failure = '';
   for (const [target, list] of groups) {
     const text = message(list, stage);
     if (!text) return { error: 'Tahap ini tidak dikabari lewat WA' };
-    const fail = await sendWa(target, text);
+    // Resi untuk pemohon: foto resinya ikut dikirim.
+    const image = stage === SENT ? await resiPhoto(list) : '';
+    const fail = await sendWa(target, text, image);
     if (fail) failure = fail;
-    else sent.push(target);
+    else {
+      sent.push(target);
+      sentIds.push(...list.map((r) => r.id));
+    }
   }
-  return sent.length ? { target: sent.join(','), failed: failure || undefined } : { error: failure };
+  return sent.length ? { target: sent.join(','), sentIds, failed: failure || undefined } : { error: failure };
 }
 
 /** Paket-paket dari tautan kurir: `items` [{id, token}] (atau satu id dan token). */
@@ -272,7 +308,8 @@ function withAttachment(v: Values, att: unknown) {
 }
 
 const PICKUP_FROM = ['Proses pengiriman'];
-const RESI_FROM = ['Proses pengiriman', 'Di-pick up kurir', 'Resi diterima'];
+// Resi yang sudah terkirim ke pemohon pun masih bisa diperbaiki kurir; pemohon dikirimi yang baru.
+const RESI_FROM = ['Proses pengiriman', 'Di-pick up kurir', 'Resi diterima', 'Resi dikirim ke user'];
 const kurirOf = (recs: Rec[]) => recs.find((r) => r.values.kurir)?.values.kurir || 'Kurir';
 const lines = (recs: Rec[], line: (v: Values) => string) =>
   recs.length === 1 ? [line(recs[0].values)] : recs.map((r, i) => `${i + 1}. ${line(r.values)}`);
@@ -381,8 +418,8 @@ Deno.serve(async (req) => {
           att = await uploadFoto(entries[0].r.id, input.foto, by);
           if (!att) return json({ error: 'Foto resi harus gambar JPG/PNG di bawah 4 MB' }, 400);
         }
-        const fixed = entries.every((e) => e.r.status === 'Resi diterima');
-        const moved = await Promise.all(
+        const fixed = entries.every((e) => STATUSES.indexOf(e.r.status) >= STATUSES.indexOf('Resi diterima'));
+        const saved = await Promise.all(
           entries.map((e) => {
             const values: Values = { ...e.r.values, resi: e.resi };
             if (e.biaya) values.biaya = e.biaya;
@@ -390,6 +427,12 @@ Deno.serve(async (req) => {
             return save(e.r, 'Resi diterima', values, by);
           }),
         );
+        // Resi dan fotonya langsung diteruskan ke pemohon (digabung per nomor), lalu tahapnya
+        // menjadi "Resi dikirim ke user". Yang gagal terkirim tetap di "Resi diterima" untuk staf.
+        const out = await notify(saved, SENT);
+        const ok = new Set('sentIds' in out ? out.sentIds : []);
+        const moved = await Promise.all(saved.map((r) => (ok.has(r.id) ? save(r, SENT, r.values, 'sistem') : r)));
+        const failed = moved.filter((r) => !ok.has(r.id));
         await tellStaff(
           [
             fixed ? 'Nomor resi diperbarui kurir' : `Resi ${moved.length > 1 ? `${moved.length} paket ` : ''}sudah dikirim ${by}:`,
@@ -398,6 +441,10 @@ Deno.serve(async (req) => {
               (v) =>
                 `${v.isi || 'Paket'} ke ${v.tujuan}: ${v.resi}${v.biaya ? ` (Rp${Number(v.biaya).toLocaleString('id-ID')})` : ''}`,
             ),
+            '',
+            failed.length
+              ? `Belum terkirim ke pemohon (${'error' in out ? out.error : out.failed}). Kirim dari dashboard dengan memindah ke tahap "${SENT}".`
+              : `Resi${att ? ' dan fotonya' : ''} sudah diteruskan ke pemohon lewat WA.`,
           ].join('\n'),
         );
         const after = recs.map((r) => moved.find((m) => m.id === r.id) ?? r);

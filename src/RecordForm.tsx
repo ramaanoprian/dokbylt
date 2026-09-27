@@ -272,7 +272,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
                 <b>Kirim resi ke pemohon</b>
                 <span className="muted small block">
                   {!values.resi?.trim()
-                    ? 'Nomor resi diisi kurir lewat tautan WA-nya, atau isi sendiri di atas.'
+                    ? 'Nomor resi dan fotonya diisi kurir lewat tautan WA-nya lalu otomatis diteruskan ke pemohon, atau isi sendiri di atas.'
                     : wa
                       ? atLast
                         ? `Resi sudah dikirim otomatis ke ${values.pengirim || '+' + wa}. Kirim ulang lewat WhatsApp Anda bila perlu.`

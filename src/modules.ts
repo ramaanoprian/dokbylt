@@ -176,7 +176,7 @@ export const MODULES: ModuleDef[] = [
     title: 'Pengiriman via Kantor Pos',
     menu: 'Kantor Pos',
     description:
-      'Paket dari unit untuk dikirim keluar daerah: didaftarkan pemohon lewat QR, diterima, diambil kurir, kurir mengunggah resi, lalu resi dikirim ke pemohon.',
+      'Paket dari unit untuk dikirim keluar daerah: didaftarkan pemohon lewat QR, diterima, diambil kurir, lalu resi yang diunggah kurir langsung diteruskan ke pemohon.',
     icon: 'pos',
     itemName: 'kiriman',
     dateField: 'tanggal',
