@@ -1,12 +1,12 @@
 // Pengiriman paket lewat Kantor Pos, dengan pemohon dan kurir pick-up yang tidak perlu login.
 //
 // Tanpa login:
-//   ajukan  pemohon dari unit mengisi formulir (#kirim-paket, dibuka dari QR)
-//   lihat   kurir membuka tautan pribadinya dari WA (butuh token)
+//   ajukan  pemohon dari unit mengisi formulir (#kirim-paket, dibuka dari QR), boleh beberapa paket
+//   lihat   kurir membuka tautan pribadinya dari WA (butuh token; satu tautan bisa beberapa paket)
 //   pickup  kurir menandai paket sudah diambil
 //   resi    kurir mengisi nomor resi (dan foto resi bila ada)
 // Dengan login staf:
-//   kabari  kirim WA sesuai tahap sekarang: ke pemohon saat paket diterima, ke kurir saat
+//   kabari  kirim WA untuk beberapa paket sekaligus, digabung per nomor: ke pemohon saat paket diterima, ke kurir saat
 //           proses pengiriman, dan resi ke pemohon saat tahap "Resi dikirim ke user"
 //
 // WA dikirim lewat Fonnte (secret FONNTE_TOKEN). Setiap langkah pemohon dan kurir juga
@@ -66,9 +66,12 @@ const cleanLines = (s: unknown, max = 400) =>
 
 const newToken = () => crypto.randomUUID().replace(/-/g, '');
 const unitOf = (v: Values) => v.unitLainnya || v.unit || '–';
-const linkOf = (r: Rec) => `${SITE}/#kirim-paket/${r.id}.${r.values.token}`;
-const paket = (v: Values) => (v.isi ? `paket "${v.isi}"` : 'paket');
-const Paket = (v: Values) => (v.isi ? `Paket "${v.isi}"` : 'Paket');
+/** Satu tautan kurir untuk beberapa paket sekaligus: #kirim-paket/<id>.<token>,<id>.<token>… */
+const linkOf = (recs: Rec[]) => `${SITE}/#kirim-paket/${recs.map((r) => `${r.id}.${r.values.token}`).join(',')}`;
+const isiOf = (v: Values) => (v.isi ? `"${v.isi}"` : 'Paket');
+const paketOf = (v: Values) => (v.isi ? `paket "${v.isi}"` : 'paket');
+const PaketOf = (v: Values) => (v.isi ? `Paket "${v.isi}"` : 'Paket');
+const MAX_PAKET = 20;
 
 async function sendWa(target: string, text: string) {
   const token = Deno.env.get('FONNTE_TOKEN');
@@ -90,84 +93,142 @@ async function tellStaff(text: string) {
 const letter = (name: string, lines: string[]) =>
   [`Halo ${name || 'Bapak/Ibu'},`, '', ...lines, '', 'Terima kasih,', SIGN].join('\n');
 
-/** Pesan untuk pemohon atau kurir sesuai tahap data sekarang; kosong bila tahap ini tidak dikabari. */
-function message(r: Rec): { to: 'pemohon' | 'kurir'; text: string } | null {
-  const v = r.values;
-  switch (r.status) {
+/** "Paket X untuk Y" atau "3 paket berikut" + daftar bernomor. */
+function listed(recs: Rec[], one: (v: Values) => string, many: string, line: (v: Values) => string) {
+  if (recs.length === 1) return [one(recs[0].values)];
+  return [many.replace('{n}', String(recs.length)), ...recs.map((r, i) => `${i + 1}. ${line(r.values)}`)];
+}
+
+const STATUSES = [
+  'Didaftarkan unit',
+  'Diterima dari unit',
+  'Proses pengiriman',
+  'Di-pick up kurir',
+  'Resi diterima',
+  'Resi dikirim ke user',
+];
+const COURIER_STAGES = ['Proses pengiriman', 'Di-pick up kurir'];
+/** Field nomor WA tujuan untuk tahap itu. */
+const targetKey = (stage: string) => (COURIER_STAGES.includes(stage) ? 'kontakKurir' : 'kontak');
+const nameOf = (v: Values, stage: string) => (COURIER_STAGES.includes(stage) ? v.kurir : v.pengirim);
+
+/** Pesan untuk pemohon atau kurir untuk beberapa paket di tahap itu; kosong bila tahap ini tidak dikabari. */
+function message(recs: Rec[], stage: string): string | null {
+  const name = nameOf(recs[0].values, stage);
+  switch (stage) {
     case 'Didaftarkan unit':
-      return {
-        to: 'pemohon',
-        text: letter(v.pengirim, [
-          `Permohonan pengiriman ${paket(v)} ke ${v.tujuan || 'tujuan'} sudah kami catat.`,
-          'Silakan serahkan paketnya ke Unit Dokumen. Kami akan menginformasikan lagi setelah paket diterima.',
-        ]),
-      };
+      return letter(name, [
+        ...listed(
+          recs,
+          (v) => `Permohonan pengiriman ${paketOf(v)} ke ${v.tujuan || 'tujuan'} sudah kami catat.`,
+          'Permohonan pengiriman {n} paket berikut sudah kami catat:',
+          (v) => `${isiOf(v)} ke ${v.tujuan}`,
+        ),
+        '',
+        'Silakan serahkan paketnya ke Unit Dokumen. Kami akan menginformasikan lagi setelah paket diterima.',
+      ]);
     case 'Diterima dari unit':
-      return {
-        to: 'pemohon',
-        text: letter(v.pengirim, [
-          `${Paket(v)} untuk ${v.tujuan || 'tujuan'} sudah kami terima dan akan segera dikirim lewat Kantor Pos.`,
-          'Kami akan menginformasikan nomor resinya setelah paket dikirim.',
-        ]),
-      };
+      return letter(name, [
+        ...listed(
+          recs,
+          (v) => `${PaketOf(v)} untuk ${v.tujuan || 'tujuan'} sudah kami terima dan akan segera dikirim lewat Kantor Pos.`,
+          '{n} paket berikut sudah kami terima dan akan segera dikirim lewat Kantor Pos:',
+          (v) => `${isiOf(v)} ke ${v.tujuan}`,
+        ),
+        '',
+        'Kami akan menginformasikan nomor resinya setelah paket dikirim.',
+      ]);
     case 'Proses pengiriman':
-      return {
-        to: 'kurir',
-        text: letter(v.kurir, [
-          'Ada paket dari Unit Dokumen Balai Yasa Lahat yang siap di-pick up:',
-          `Isi: ${v.isi || '–'}`,
-          `Tujuan: ${v.tujuan || '–'}`,
-          ...(v.alamat ? [`Alamat: ${v.alamat}`] : []),
-          '',
-          'Setelah paket diambil, tekan tautan ini untuk konfirmasi. Tautan yang sama dipakai untuk mengirim nomor resi:',
-          linkOf(r),
-        ]),
-      };
+      return letter(name, [
+        recs.length === 1
+          ? 'Ada paket dari Unit Dokumen Balai Yasa Lahat yang siap di-pick up:'
+          : `Ada ${recs.length} paket dari Unit Dokumen Balai Yasa Lahat yang siap di-pick up:`,
+        ...recs.flatMap((r, i) => {
+          const v = r.values;
+          const head = recs.length === 1 ? '' : `${i + 1}. `;
+          return [
+            ...(recs.length > 1 && i > 0 ? [''] : []),
+            `${head}Isi: ${v.isi || '–'}`,
+            `${recs.length === 1 ? '' : '   '}Tujuan: ${v.tujuan || '–'}`,
+            ...(v.alamat ? [`${recs.length === 1 ? '' : '   '}Alamat: ${v.alamat.replace(/\n+/g, ', ')}`] : []),
+          ];
+        }),
+        '',
+        `Setelah ${recs.length === 1 ? 'paket' : 'semua paket'} diambil, tekan tautan ini untuk konfirmasi. Tautan yang sama dipakai untuk mengirim nomor resi:`,
+        linkOf(recs),
+      ]);
     case 'Di-pick up kurir':
-      return {
-        to: 'kurir',
-        text: letter(v.kurir, [
-          `Terima kasih, paket untuk ${v.tujuan || 'tujuan'} sudah tercatat diambil.`,
-          'Setelah paket dikirim di Kantor Pos, isi nomor resinya (dan foto resi bila ada) lewat tautan ini:',
-          linkOf(r),
-        ]),
-      };
+      return letter(name, [
+        recs.length === 1
+          ? `Terima kasih, paket untuk ${recs[0].values.tujuan || 'tujuan'} sudah tercatat diambil.`
+          : `Terima kasih, ${recs.length} paket sudah tercatat diambil.`,
+        'Setelah dikirim di Kantor Pos, isi nomor resinya (dan foto resi bila ada) lewat tautan ini:',
+        linkOf(recs),
+      ]);
     case 'Resi dikirim ke user':
-      return {
-        to: 'pemohon',
-        text: letter(v.pengirim, [
-          `${Paket(v)} untuk ${v.tujuan || 'tujuan'} sudah dikirim lewat Kantor Pos.`,
-          `Nomor resi: *${v.resi || '–'}*`,
-          '',
-          'Status pengiriman bisa dicek di https://www.posindonesia.co.id/id/tracking',
-        ]),
-      };
+      return letter(name, [
+        ...(recs.length === 1
+          ? [
+              `${PaketOf(recs[0].values)} untuk ${recs[0].values.tujuan || 'tujuan'} sudah dikirim lewat Kantor Pos.`,
+              `Nomor resi: *${recs[0].values.resi || '–'}*`,
+            ]
+          : [
+              `${recs.length} paket berikut sudah dikirim lewat Kantor Pos:`,
+              ...recs.map((r, i) => `${i + 1}. ${isiOf(r.values)} ke ${r.values.tujuan}, resi *${r.values.resi || '–'}*`),
+            ]),
+        '',
+        'Status pengiriman bisa dicek di https://www.posindonesia.co.id/id/tracking',
+      ]);
     default:
       return null;
   }
 }
 
-async function notify(r: Rec) {
-  const m = message(r);
-  if (!m) return { error: 'Tahap ini tidak dikabari lewat WA' };
-  const target = waNumber(m.to === 'kurir' ? r.values.kontakKurir : r.values.kontak);
-  if (!target) return { error: m.to === 'kurir' ? 'Nomor WA kurir belum diisi' : 'Nomor WA pemohon belum diisi' };
-  const fail = await sendWa(target, m.text);
-  return fail ? { error: fail } : { target };
+/** Kirim WA untuk paket-paket di tahap itu, digabung per nomor tujuan. */
+async function notify(recs: Rec[], stage: string) {
+  const groups = new Map<string, Rec[]>();
+  for (const r of recs) {
+    const target = waNumber(r.values[targetKey(stage)]);
+    if (target) groups.set(target, [...(groups.get(target) ?? []), r]);
+  }
+  if (!groups.size)
+    return { error: COURIER_STAGES.includes(stage) ? 'Nomor WA kurir belum diisi' : 'Nomor WA pemohon belum diisi' };
+  const sent: string[] = [];
+  let failure = '';
+  for (const [target, list] of groups) {
+    const text = message(list, stage);
+    if (!text) return { error: 'Tahap ini tidak dikabari lewat WA' };
+    const fail = await sendWa(target, text);
+    if (fail) failure = fail;
+    else sent.push(target);
+  }
+  return sent.length ? { target: sent.join(','), failed: failure || undefined } : { error: failure };
 }
 
-async function byToken(input: { id?: unknown; token?: unknown }) {
-  const id = clean(input.id, 40);
-  const token = clean(input.token, 64);
-  if (!id || !token) return null;
-  const { data } = await admin.from('records').select('id, module, status, values, history').eq('id', id).maybeSingle();
-  const r = data as Rec | null;
-  if (!r || r.module !== 'pos' || !r.values.token || r.values.token !== token) return null;
-  return r;
+/** Paket-paket dari tautan kurir: `items` [{id, token}] (atau satu id dan token). */
+async function byTokens(input: { items?: unknown; id?: unknown; token?: unknown }) {
+  const raw = Array.isArray(input.items) ? input.items : [{ id: input.id, token: input.token }];
+  const want = raw
+    .slice(0, MAX_PAKET)
+    .map((x: { id?: unknown; token?: unknown }) => ({ id: clean(x?.id, 40), token: clean(x?.token, 64) }))
+    .filter((x) => x.id && x.token);
+  if (!want.length) return [];
+  const { data } = await admin
+    .from('records')
+    .select('id, module, status, values, history')
+    .in(
+      'id',
+      want.map((x) => x.id),
+    );
+  const found = (data ?? []) as Rec[];
+  return want
+    .map((w) => found.find((r) => r.id === w.id && r.module === 'pos' && r.values.token && r.values.token === w.token))
+    .filter((r): r is Rec => !!r);
 }
 
 // Yang boleh dilihat kurir: tidak ada nomor WA pemohon.
 const courierView = (r: Rec) => ({
+  id: r.id,
   status: r.status,
   unit: unitOf(r.values),
   pengirim: r.values.pengirim,
@@ -176,6 +237,7 @@ const courierView = (r: Rec) => ({
   isi: r.values.isi,
   kurir: r.values.kurir,
   resi: r.values.resi,
+  biaya: r.values.biaya,
   history: r.history.map((h) => ({ status: h.status, at: h.at })),
 });
 
@@ -187,20 +249,33 @@ async function save(r: Rec, status: string, values: Values, by: string) {
   return { ...r, status, values, history };
 }
 
-async function uploadFoto(r: Rec, foto: { data?: unknown; type?: unknown }, by: string) {
+async function uploadFoto(id: string, foto: { data?: unknown; type?: unknown }, by: string) {
   const type = String(foto.type ?? '');
   if (!/^image\/(jpeg|png|webp)$/.test(type)) return null;
   const bytes = Uint8Array.from(atob(String(foto.data ?? '')), (c) => c.charCodeAt(0));
   if (!bytes.length || bytes.length > MAX_FOTO) return null;
   const ext = type.split('/')[1].replace('jpeg', 'jpg');
-  const path = `pos/${r.id}/resi-${Date.now()}.${ext}`;
+  const path = `pos/${id}/resi-${Date.now()}.${ext}`;
   const { error } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: type });
   if (error) throw error;
   return { path, name: `Foto resi.${ext}`, type, size: bytes.length, at: new Date().toISOString(), by };
 }
 
+function withAttachment(v: Values, att: unknown) {
+  let list: unknown[] = [];
+  try {
+    list = JSON.parse(v.lampiran || '[]');
+  } catch {
+    list = [];
+  }
+  return JSON.stringify([...(Array.isArray(list) ? list : []), att]);
+}
+
 const PICKUP_FROM = ['Proses pengiriman'];
 const RESI_FROM = ['Proses pengiriman', 'Di-pick up kurir', 'Resi diterima'];
+const kurirOf = (recs: Rec[]) => recs.find((r) => r.values.kurir)?.values.kurir || 'Kurir';
+const lines = (recs: Rec[], line: (v: Values) => string) =>
+  recs.length === 1 ? [line(recs[0].values)] : recs.map((r, i) => `${i + 1}. ${line(r.values)}`);
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -211,101 +286,122 @@ Deno.serve(async (req) => {
     switch (input.action) {
       case 'ajukan': {
         // Kolom jebakan: diisi berarti bot.
-        if (input.website) return json({ ok: true });
+        if (input.website) return json({ ok: true, count: 0 });
         const f = input.form ?? {};
-        const v: Values = {
+        const common: Values = {
           tanggal: new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10),
           unit: UNITS.includes(f.unit) ? f.unit : '',
           unitLainnya: f.unit === 'Lainnya' ? clean(f.unitLainnya, 80) : '',
           pengirim: clean(f.pengirim, 80),
           kontak: clean(f.kontak, 30),
-          tujuan: clean(f.tujuan, 160),
-          alamat: cleanLines(f.alamat),
-          isi: clean(f.isi, 160),
           catatan: clean(f.catatan, 500),
           sumber: 'Formulir online',
         };
-        if (!v.unit || !v.pengirim) return json({ error: 'Unit dan nama pemohon wajib diisi' }, 400);
-        if (v.unit === 'Lainnya' && !v.unitLainnya) return json({ error: 'Tulis nama unitnya' }, 400);
-        if (!waNumber(v.kontak)) return json({ error: 'Nomor WA tidak valid' }, 400);
-        if (!v.tujuan || !v.alamat) return json({ error: 'Penerima dan alamat tujuan wajib diisi' }, 400);
-        for (const k of Object.keys(v)) if (!v[k]) delete v[k];
-        v.token = newToken();
+        if (!common.unit || !common.pengirim) return json({ error: 'Unit dan nama pemohon wajib diisi' }, 400);
+        if (common.unit === 'Lainnya' && !common.unitLainnya) return json({ error: 'Tulis nama unitnya' }, 400);
+        if (!waNumber(common.kontak)) return json({ error: 'Nomor WA tidak valid' }, 400);
+        // Beberapa paket sekaligus; formulir lama mengirim satu paket di dalam `form`.
+        const list = (Array.isArray(input.paket) ? input.paket : [f]).slice(0, MAX_PAKET);
+        const items = list.map((p: Record<string, unknown>) => ({
+          tujuan: clean(p?.tujuan, 160),
+          alamat: cleanLines(p?.alamat),
+          isi: clean(p?.isi, 160),
+        }));
+        if (!items.length) return json({ error: 'Tambahkan minimal satu paket' }, 400);
+        const bad = items.findIndex((p) => !p.tujuan || !p.alamat);
+        if (bad >= 0)
+          return json({ error: items.length > 1 ? `Lengkapi penerima dan alamat paket nomor ${bad + 1}` : 'Penerima dan alamat tujuan wajib diisi' }, 400);
 
         const at = new Date().toISOString();
-        const { data, error } = await admin
-          .from('records')
-          .insert({
-            module: 'pos',
-            status: 'Didaftarkan unit',
-            values: v,
-            history: [{ status: 'Didaftarkan unit', at, by: v.pengirim }],
-          })
-          .select('id, module, status, values, history')
-          .single();
+        const rows = items.map((p) => {
+          const v: Values = { ...common, ...p, token: newToken() };
+          for (const k of Object.keys(v)) if (!v[k]) delete v[k];
+          return { module: 'pos', status: 'Didaftarkan unit', values: v, history: [{ status: 'Didaftarkan unit', at, by: common.pengirim }] };
+        });
+        const { data, error } = await admin.from('records').insert(rows).select('id, module, status, values, history');
         if (error) throw error;
-        const r = data as Rec;
-        await notify(r);
+        const recs = (data ?? []) as Rec[];
+        await notify(recs, 'Didaftarkan unit');
         await tellStaff(
           [
-            'Permohonan kirim paket baru',
-            `${v.pengirim} (${unitOf(v)}), ${v.kontak}`,
-            `${v.isi || 'Paket'} ke ${v.tujuan}`,
+            recs.length > 1 ? `${recs.length} permohonan kirim paket baru` : 'Permohonan kirim paket baru',
+            `${common.pengirim} (${unitOf(common)}), ${common.kontak}`,
+            ...lines(recs, (v) => `${v.isi || 'Paket'} ke ${v.tujuan}`),
           ].join('\n'),
         );
-        return json({ ok: true });
+        return json({ ok: true, count: recs.length });
       }
 
       case 'lihat': {
-        const r = await byToken(input);
-        return r ? json({ ok: true, paket: courierView(r) }) : json({ error: 'Tautan tidak valid' }, 404);
+        const recs = await byTokens(input);
+        return recs.length ? json({ ok: true, paket: recs.map(courierView) }) : json({ error: 'Tautan tidak valid' }, 404);
       }
 
       case 'pickup': {
-        const r = await byToken(input);
-        if (!r) return json({ error: 'Tautan tidak valid' }, 404);
-        if (r.status === 'Di-pick up kurir') return json({ ok: true, paket: courierView(r) });
-        if (!PICKUP_FROM.includes(r.status))
-          return json({ error: `Belum bisa: paket masih di tahap "${r.status}"`, paket: courierView(r) }, 409);
-        const moved = await save(r, 'Di-pick up kurir', r.values, r.values.kurir || 'Kurir');
-        await notify(moved);
-        await tellStaff(`${Paket(moved.values)} ke ${moved.values.tujuan} sudah di-pick up ${moved.values.kurir || 'kurir'}.`);
-        return json({ ok: true, paket: courierView(moved) });
+        const recs = await byTokens(input);
+        if (!recs.length) return json({ error: 'Tautan tidak valid' }, 404);
+        const ready = recs.filter((r) => PICKUP_FROM.includes(r.status));
+        if (!ready.length) {
+          const view = recs.map(courierView);
+          return recs.some((r) => r.status === 'Di-pick up kurir')
+            ? json({ ok: true, paket: view })
+            : json({ error: `Belum bisa: paket masih di tahap "${recs[0].status}"`, paket: view }, 409);
+        }
+        const moved = await Promise.all(ready.map((r) => save(r, 'Di-pick up kurir', r.values, r.values.kurir || 'Kurir')));
+        await notify(moved, 'Di-pick up kurir');
+        await tellStaff(
+          [
+            `${moved.length > 1 ? `${moved.length} paket` : 'Paket'} sudah di-pick up ${kurirOf(moved)}:`,
+            ...lines(moved, (v) => `${v.isi || 'Paket'} ke ${v.tujuan}`),
+          ].join('\n'),
+        );
+        const after = recs.map((r) => moved.find((m) => m.id === r.id) ?? r);
+        return json({ ok: true, paket: after.map(courierView) });
       }
 
       case 'resi': {
-        const r = await byToken(input);
-        if (!r) return json({ error: 'Tautan tidak valid' }, 404);
-        if (!RESI_FROM.includes(r.status))
-          return json({ error: `Belum bisa: paket masih di tahap "${r.status}"`, paket: courierView(r) }, 409);
-        const resi = clean(input.resi, 60);
-        if (!resi) return json({ error: 'Nomor resi wajib diisi' }, 400);
-        const by = r.values.kurir || 'Kurir';
-        const values: Values = { ...r.values, resi };
-        const biaya = clean(input.biaya, 20).replace(/\D/g, '');
-        if (biaya) values.biaya = biaya;
+        const recs = await byTokens(input);
+        if (!recs.length) return json({ error: 'Tautan tidak valid' }, 404);
+        // Nomor resi per paket: items [{id, token, resi, biaya}], atau satu resi untuk satu paket.
+        const raw: Record<string, unknown>[] = Array.isArray(input.items) ? input.items : [input];
+        const entries = recs
+          .map((r) => {
+            const x = raw.find((i) => clean(i?.id, 40) === r.id) ?? {};
+            return { r, resi: clean(x.resi, 60), biaya: clean(x.biaya, 20).replace(/\D/g, '') };
+          })
+          .filter((e) => e.resi);
+        if (!entries.length) return json({ error: 'Nomor resi wajib diisi' }, 400);
+        const blocked = entries.find((e) => !RESI_FROM.includes(e.r.status));
+        if (blocked)
+          return json({ error: `Belum bisa: paket masih di tahap "${blocked.r.status}"`, paket: recs.map(courierView) }, 409);
+        const by = kurirOf(recs);
+        // Satu foto resi (mis. struk berisi beberapa resi) dilampirkan ke semua paket yang diisi.
+        let att: unknown = null;
         if (input.foto) {
-          const att = await uploadFoto(r, input.foto, by);
+          att = await uploadFoto(entries[0].r.id, input.foto, by);
           if (!att) return json({ error: 'Foto resi harus gambar JPG/PNG di bawah 4 MB' }, 400);
-          let list: unknown[] = [];
-          try {
-            list = JSON.parse(r.values.lampiran || '[]');
-          } catch {
-            list = [];
-          }
-          values.lampiran = JSON.stringify([...(Array.isArray(list) ? list : []), att]);
         }
-        const fixed = r.status === 'Resi diterima';
-        const moved = await save(r, 'Resi diterima', values, by);
+        const fixed = entries.every((e) => e.r.status === 'Resi diterima');
+        const moved = await Promise.all(
+          entries.map((e) => {
+            const values: Values = { ...e.r.values, resi: e.resi };
+            if (e.biaya) values.biaya = e.biaya;
+            if (att) values.lampiran = withAttachment(values, att);
+            return save(e.r, 'Resi diterima', values, by);
+          }),
+        );
         await tellStaff(
           [
-            fixed ? 'Nomor resi diperbarui kurir' : 'Resi paket sudah dikirim kurir',
-            `${Paket(moved.values)} ke ${moved.values.tujuan}`,
-            `Resi: ${resi}${biaya ? ` · Rp${Number(biaya).toLocaleString('id-ID')}` : ''}`,
-            `Pemohon: ${moved.values.pengirim} (${unitOf(moved.values)})`,
+            fixed ? 'Nomor resi diperbarui kurir' : `Resi ${moved.length > 1 ? `${moved.length} paket ` : ''}sudah dikirim ${by}:`,
+            ...lines(
+              moved,
+              (v) =>
+                `${v.isi || 'Paket'} ke ${v.tujuan}: ${v.resi}${v.biaya ? ` (Rp${Number(v.biaya).toLocaleString('id-ID')})` : ''}`,
+            ),
           ].join('\n'),
         );
-        return json({ ok: true, paket: courierView(moved) });
+        const after = recs.map((r) => moved.find((m) => m.id === r.id) ?? r);
+        return json({ ok: true, paket: after.map(courierView) });
       }
 
       case 'kabari': {
@@ -314,20 +410,27 @@ Deno.serve(async (req) => {
         });
         const { data: user } = await db.auth.getUser();
         if (!user?.user) return json({ error: 'Harus masuk terlebih dahulu' }, 401);
-        const { data } = await db
-          .from('records')
-          .select('id, module, status, values, history')
-          .eq('id', clean(input.id, 40))
-          .maybeSingle();
-        const r = data as Rec | null;
-        if (!r || r.module !== 'pos') return json({ error: 'Data tidak ditemukan' }, 404);
+        // Beberapa id sekaligus; paket dengan nomor tujuan yang sama digabung jadi satu pesan.
+        const ids: string[] = (Array.isArray(input.ids) ? input.ids : input.id ? [input.id] : [])
+          .filter((x: unknown) => typeof x === 'string')
+          .slice(0, 50);
+        if (!ids.length) return json({ error: 'id kosong' }, 400);
+        const { data } = await db.from('records').select('id, module, status, values, history').in('id', ids);
+        const found = ((data ?? []) as Rec[]).filter((r) => r.module === 'pos');
+        if (!found.length) return json({ error: 'Data tidak ditemukan' }, 404);
+        found.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+        const stage = typeof input.stage === 'string' ? input.stage : found[0].status;
+        // Hanya paket yang memang sudah sampai (atau melewati) tahap itu.
+        const recs = found.filter((r) => STATUSES.indexOf(r.status) >= STATUSES.indexOf(stage));
+        if (!recs.length) return json({ error: 'Belum ada paket yang perlu dikabari' }, 409);
         // Data yang dicatat staf langsung di dashboard belum punya token: buatkan agar tautan kurir jalan.
-        if (!r.values.token) {
-          r.values = { ...r.values, token: newToken() };
-          await admin.from('records').update({ values: r.values }).eq('id', r.id);
-        }
-        const out = await notify(r);
-        return 'error' in out ? json({ error: out.error }, 502) : json({ ok: true, target: out.target });
+        for (const r of recs)
+          if (!r.values.token) {
+            r.values = { ...r.values, token: newToken() };
+            await admin.from('records').update({ values: r.values }).eq('id', r.id);
+          }
+        const out = await notify(recs, stage);
+        return 'error' in out ? json({ error: out.error }, 502) : json({ ok: true, target: out.target, failed: out.failed });
       }
 
       default:

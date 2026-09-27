@@ -30,8 +30,12 @@ export interface ModuleDef {
   dateField: string;
   /** Tenggat bawaan: sekian hari kerja setelah tanggal utama. Tetap bisa diubah di form. */
   dueDays?: number;
-  /** Tahap-tahap yang memicu pesan WA ke PIC unit (nomor di field `kontakPic`), digabung per nomor. */
+  /** Tahap-tahap yang memicu pesan WA (bawaan ke nomor di field `kontakPic`), digabung per nomor. */
   notifyStages?: string[];
+  /** Field nomor WA tujuan bila bukan `notifyContact`, per tahap (mis. kurir paket). */
+  notifyTo?: Record<string, string>;
+  /** Field nomor WA tujuan bawaan untuk `notifyStages`; bila kosong `kontakPic`. */
+  notifyContact?: string;
   /** Tahap WA "sudah ditandatangani", untuk tombol kirim ulang manual di form. */
   notifyStatus?: string;
   /** Tahap awal sebelum diproses (didaftarkan unit sendiri lewat formulir publik). */
@@ -165,7 +169,9 @@ export const MODULES: ModuleDef[] = [
   {
     id: 'pos',
     preStatus: 'Didaftarkan unit',
-    notifyOn: ['Diterima dari unit', 'Proses pengiriman', 'Resi dikirim ke user'],
+    notifyStages: ['Diterima dari unit', 'Proses pengiriman', 'Resi dikirim ke user'],
+    notifyTo: { 'Proses pengiriman': 'kontakKurir' },
+    notifyContact: 'kontak',
     dueDays: 2,
     title: 'Pengiriman via Kantor Pos',
     menu: 'Kantor Pos',
@@ -294,6 +300,12 @@ export const MODULES: ModuleDef[] = [
     requiredForStatus: { Disetujui: ['serah'] },
   },
 ];
+
+/** Field nomor WA yang dikabari pada tahap itu. */
+export const notifyKey = (mod: ModuleDef, stage: string) => mod.notifyTo?.[stage] ?? mod.notifyContact ?? 'kontakPic';
+
+/** Field nama pemilik nomor WA, untuk tulisan "WA ke …". */
+export const CONTACT_NAME: Record<string, string> = { kontakPic: 'pic', kontakKurir: 'kurir', kontak: 'pengirim' };
 
 /** Tahap awal untuk data yang dicatat staf (melewati tahap "didaftarkan unit"). */
 export const firstStatus = (mod: ModuleDef) => mod.statuses.find((s) => s !== mod.preStatus) ?? mod.statuses[0];
