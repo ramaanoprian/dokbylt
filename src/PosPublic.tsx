@@ -279,16 +279,20 @@ function CourierPage({ items }: { items: Pair[] }) {
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [resi, setResi] = useState<Record<string, { resi: string; biaya: string }>>({});
-  const [foto, setFoto] = useState<{ blob: Blob; url: string } | null>(null);
+  // Foto resi per paket: satu alamat, satu resi, satu foto.
+  const [fotos, setFotos] = useState<Record<string, { blob: Blob; url: string }>>({});
   const [editing, setEditing] = useState(false);
   const camRef = useRef<HTMLInputElement>(null);
+  const camFor = useRef('');
 
   useEffect(() => {
     callFunction('kirim-paket', { action: 'lihat', items }).then((r) =>
       r.ok ? setList(r.data.paket as Paket[]) : setError(r.error),
     );
   }, [items]);
-  useEffect(() => () => void (foto && URL.revokeObjectURL(foto.url)), [foto]);
+  const fotosRef = useRef(fotos);
+  fotosRef.current = fotos;
+  useEffect(() => () => Object.values(fotosRef.current).forEach((f) => URL.revokeObjectURL(f.url)), []);
 
   const call = async (body: Record<string, unknown>) => {
     setSending(true);
@@ -301,9 +305,23 @@ function CourierPage({ items }: { items: Pair[] }) {
   };
 
   const pickFoto = async (file?: File) => {
-    if (!file) return;
+    const id = camFor.current;
+    if (!file || !id) return;
     const blob = await shrink(file);
-    setFoto({ blob, url: URL.createObjectURL(blob) });
+    setFotos((x) => {
+      if (x[id]) URL.revokeObjectURL(x[id].url);
+      return { ...x, [id]: { blob, url: URL.createObjectURL(blob) } };
+    });
+  };
+  const dropFoto = (id: string) =>
+    setFotos((x) => {
+      const { [id]: gone, ...rest } = x;
+      if (gone) URL.revokeObjectURL(gone.url);
+      return rest;
+    });
+  const openCam = (id: string) => {
+    camFor.current = id;
+    camRef.current?.click();
   };
 
   if (!list)
@@ -338,11 +356,21 @@ function CourierPage({ items }: { items: Pair[] }) {
     const pairs = new Map(items.map((i) => [i.id, i.token]));
     const body: Record<string, unknown> = {
       action: 'resi',
-      items: toFill.map((p) => ({ id: p.id, token: pairs.get(p.id), ...field(p) })),
+      items: await Promise.all(
+        toFill.map(async (p) => {
+          const f = fotos[p.id];
+          return {
+            id: p.id,
+            token: pairs.get(p.id),
+            ...field(p),
+            ...(f ? { foto: { data: await toBase64(f.blob), type: f.blob.type || 'image/jpeg' } } : {}),
+          };
+        }),
+      ),
     };
-    if (foto) body.foto = { data: await toBase64(foto.blob), type: foto.blob.type || 'image/jpeg' };
     if (await call(body)) {
-      setFoto(null);
+      Object.values(fotos).forEach((f) => URL.revokeObjectURL(f.url));
+      setFotos({});
       setEditing(false);
       setResi({});
     }
@@ -422,30 +450,30 @@ function CourierPage({ items }: { items: Pair[] }) {
                   onChange={(e) => setField(p, 'biaya', e.target.value)}
                 />
               </div>
+              <div className="foto-resi">
+                {fotos[p.id] ? (
+                  <div className="foto-prev">
+                    <img src={fotos[p.id].url} alt={`Foto resi ${p.tujuan}`} />
+                    <button type="button" className="icon-btn" aria-label={`Hapus foto resi ${p.tujuan}`} onClick={() => dropFoto(p.id)}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" className="btn" onClick={() => openCam(p.id)}>
+                    <Camera size={16} /> Foto resi{many ? ` ${p.tujuan}` : ''}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
-          <div className="full foto-resi">
-            {foto ? (
-              <div className="foto-prev">
-                <img src={foto.url} alt="Foto resi" />
-                <button type="button" className="icon-btn" aria-label="Hapus foto" onClick={() => setFoto(null)}>
-                  <X size={16} />
-                </button>
-              </div>
-            ) : (
-              <button type="button" className="btn" onClick={() => camRef.current?.click()}>
-                <Camera size={16} /> Foto resi{many ? ' (boleh satu untuk semua)' : ''}
-              </button>
-            )}
-            <input
-              ref={camRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              hidden
-              onChange={(e) => (pickFoto(e.target.files?.[0]), (e.target.value = ''))}
-            />
-          </div>
+          <input
+            ref={camRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(e) => (pickFoto(e.target.files?.[0]), (e.target.value = ''))}
+          />
           <button className="pill-btn big block full" disabled={sending}>
             {sending ? <Loader2 size={18} className="spin" /> : null} Kirim resi
           </button>

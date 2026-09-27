@@ -73,11 +73,7 @@ const paketOf = (v: Values) => (v.isi ? `paket "${v.isi}"` : 'paket');
 const PaketOf = (v: Values) => (v.isi ? `Paket "${v.isi}"` : 'Paket');
 const MAX_PAKET = 20;
 
-/**
- * Kirim WA lewat Fonnte; kosong bila berhasil, alasan gagal bila tidak. Dengan `image`, gambar
- * ikut dikirim dan teks menjadi keterangannya. Paket Fonnte yang tidak mendukung lampiran
- * menolaknya, jadi pesan dikirim ulang sebagai teks dengan tautan ke gambar.
- */
+/** Kirim WA lewat Fonnte; kosong bila berhasil, alasan gagal bila tidak. */
 async function sendWa(target: string, text: string, image = ''): Promise<string> {
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!token) return 'FONNTE_TOKEN belum diatur';
@@ -88,9 +84,8 @@ async function sendWa(target: string, text: string, image = ''): Promise<string>
   if (image) body.set('url', image);
   const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: token }, body });
   const out = await res.json().catch(() => ({}));
-  const fail = !res.ok || out.status === false ? out.reason || `Fonnte menolak (${res.status})` : '';
-  if (fail && image) return sendWa(target, `${text}\n\nFoto resi: ${image}`);
-  return fail;
+  console.log(image ? 'fonnte gambar' : 'fonnte teks', JSON.stringify(out));
+  return !res.ok || out.status === false ? out.reason || `Fonnte menolak (${res.status})` : '';
 }
 
 interface Att {
@@ -98,16 +93,14 @@ interface Att {
   name: string;
 }
 
-/** Tautan sementara (30 hari) ke foto resi terbaru dari paket-paket ini, bila ada. */
-async function resiPhoto(recs: Rec[]) {
+/** Tautan sementara (30 hari) ke foto resi terbaru satu paket, bila ada. */
+async function resiPhoto(r: Rec) {
   let latest: Att | null = null;
-  for (const r of recs) {
-    try {
-      const list = JSON.parse(r.values.lampiran || '[]') as Att[];
-      for (const a of list) if (a?.name?.startsWith('Foto resi') && (!latest || a.path > latest.path)) latest = a;
-    } catch {
-      // lampiran rusak: lewati
-    }
+  try {
+    const list = JSON.parse(r.values.lampiran || '[]') as Att[];
+    for (const a of list) if (a?.name?.startsWith('Foto resi') && (!latest || a.path > latest.path)) latest = a;
+  } catch {
+    // lampiran rusak: lewati
   }
   if (!latest) return '';
   const { data } = await admin.storage.from(BUCKET).createSignedUrl(latest.path, 30 * 24 * 3600);
@@ -227,15 +220,25 @@ async function notify(recs: Rec[], stage: string) {
   const sentIds: string[] = [];
   let failure = '';
   for (const [target, list] of groups) {
-    const text = message(list, stage);
+    let text = message(list, stage);
     if (!text) return { error: 'Tahap ini tidak dikabari lewat WA' };
-    // Resi untuk pemohon: foto resinya ikut dikirim.
-    const image = stage === SENT ? await resiPhoto(list) : '';
-    const fail = await sendWa(target, text, image);
+    // Resi untuk pemohon: tautan foto resi tiap paket ikut di teks (pasti sampai), lalu fotonya
+    // dikirim sebagai gambar terpisah bila paket Fonnte mendukung lampiran.
+    const photos =
+      stage === SENT
+        ? (await Promise.all(list.map(async (r) => ({ r, url: await resiPhoto(r) })))).filter((x) => x.url)
+        : [];
+    if (photos.length)
+      text += `\n\nFoto resi:\n${photos
+        .map((x) => (list.length > 1 ? `${list.indexOf(x.r) + 1}. ${x.url}` : x.url))
+        .join('\n')}`;
+    const fail = await sendWa(target, text);
     if (fail) failure = fail;
     else {
       sent.push(target);
       sentIds.push(...list.map((r) => r.id));
+      for (const x of photos)
+        await sendWa(target, `Foto resi ${x.r.values.tujuan || ''}: ${x.r.values.resi || ''}`.trim(), x.url);
     }
   }
   return sent.length ? { target: sent.join(','), sentIds, failed: failure || undefined } : { error: failure };
@@ -404,7 +407,12 @@ Deno.serve(async (req) => {
         const entries = recs
           .map((r) => {
             const x = raw.find((i) => clean(i?.id, 40) === r.id) ?? {};
-            return { r, resi: clean(x.resi, 60), biaya: clean(x.biaya, 20).replace(/\D/g, '') };
+            return {
+              r,
+              resi: clean(x.resi, 60),
+              biaya: clean(x.biaya, 20).replace(/\D/g, ''),
+              foto: x.foto as { data?: unknown; type?: unknown } | undefined,
+            };
           })
           .filter((e) => e.resi);
         if (!entries.length) return json({ error: 'Nomor resi wajib diisi' }, 400);
@@ -412,17 +420,23 @@ Deno.serve(async (req) => {
         if (blocked)
           return json({ error: `Belum bisa: paket masih di tahap "${blocked.r.status}"`, paket: recs.map(courierView) }, 409);
         const by = kurirOf(recs);
-        // Satu foto resi (mis. struk berisi beberapa resi) dilampirkan ke semua paket yang diisi.
-        let att: unknown = null;
-        if (input.foto) {
-          att = await uploadFoto(entries[0].r.id, input.foto, by);
-          if (!att) return json({ error: 'Foto resi harus gambar JPG/PNG di bawah 4 MB' }, 400);
-        }
+        // Foto resi per paket (items[].foto). Satu foto di luar items (formulir lama) berlaku untuk semua.
+        const shared = input.foto ? await uploadFoto(entries[0].r.id, input.foto, by) : null;
+        if (input.foto && !shared) return json({ error: 'Foto resi harus gambar JPG/PNG di bawah 4 MB' }, 400);
+        const atts = new Map<string, unknown>();
+        for (const e of entries)
+          if (e.foto) {
+            const att = await uploadFoto(e.r.id, e.foto, by);
+            if (!att) return json({ error: `Foto resi ${e.r.values.tujuan || ''} harus gambar JPG/PNG di bawah 4 MB` }, 400);
+            atts.set(e.r.id, att);
+          }
+        const withFoto = atts.size > 0 || !!shared;
         const fixed = entries.every((e) => STATUSES.indexOf(e.r.status) >= STATUSES.indexOf('Resi diterima'));
         const saved = await Promise.all(
           entries.map((e) => {
             const values: Values = { ...e.r.values, resi: e.resi };
             if (e.biaya) values.biaya = e.biaya;
+            const att = atts.get(e.r.id) ?? shared;
             if (att) values.lampiran = withAttachment(values, att);
             return save(e.r, 'Resi diterima', values, by);
           }),
@@ -444,7 +458,7 @@ Deno.serve(async (req) => {
             '',
             failed.length
               ? `Belum terkirim ke pemohon (${'error' in out ? out.error : out.failed}). Kirim dari dashboard dengan memindah ke tahap "${SENT}".`
-              : `Resi${att ? ' dan fotonya' : ''} sudah diteruskan ke pemohon lewat WA.`,
+              : `Resi${withFoto ? ' dan fotonya' : ''} sudah diteruskan ke pemohon lewat WA.`,
           ].join('\n'),
         );
         const after = recs.map((r) => moved.find((m) => m.id === r.id) ?? r);
