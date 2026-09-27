@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { Copy, Printer, QrCode, X } from 'lucide-react';
 import { useToast } from './toast';
 
-/** QR formulir publik (pinjam drone, daftar dokumen TTD EVP) yang bisa dicetak dan ditempel. */
+/** QR formulir publik (pinjam drone, daftar dokumen TTD EVP, kirim paket) yang bisa dicetak dan ditempel. */
 export interface QrForm {
   hash: string;
   /** Judul di kertas cetak, mis. "Pinjam drone". */
@@ -18,6 +18,11 @@ export const QR_FORMS: Partial<Record<string, QrForm>> = {
     hash: 'pinjam-drone',
     title: 'Pinjam drone',
     hint: 'Cetak dan tempel di unit atau di kotak drone. Unit cukup scan lalu isi formulir, tanpa login.',
+  },
+  pos: {
+    hash: 'kirim-paket',
+    title: 'Kirim paket via Kantor Pos',
+    hint: 'Cetak dan tempel di meja Unit Dokumen atau di unit. Pemohon scan lalu mengisi tujuan paket sebelum menyerahkannya.',
   },
   evp: {
     hash: 'daftar-dokumen',

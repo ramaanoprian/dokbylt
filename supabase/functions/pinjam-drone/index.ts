@@ -9,7 +9,7 @@
 //   kabari      kirim WA ke peminjam sesuai tahapnya sekarang (setelah staf memindah tahap)
 //
 // WA dikirim lewat Fonnte (secret FONNTE_TOKEN). Bila secret DOKUMEN_WA diisi (nomor WA
-// Unit Dokumen), pengajuan baru dan pengembalian juga dikabarkan ke nomor itu.
+// Unit Dokumen, boleh beberapa dipisah koma), pengajuan baru dan pengembalian juga dikabarkan ke sana.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const SITE = Deno.env.get('SITE_URL') || 'https://dokumenbylt.my.id';
@@ -43,6 +43,10 @@ function waNumber(kontak = '') {
   const digits = m[0].replace(/\D/g, '');
   return digits.startsWith('0') ? '62' + digits.slice(1) : digits;
 }
+
+/** Nomor-nomor WA Unit Dokumen dari secret DOKUMEN_WA, mis. "0812..., 0813...". */
+const staffNumbers = () =>
+  [...new Set((Deno.env.get('DOKUMEN_WA') ?? '').split(/[,;\n]/).map((n) => waNumber(n)).filter(Boolean))].join(',');
 
 const isDate = (s = '') => /^\d{4}-\d{2}-\d{2}$/.test(s);
 const clean = (s: unknown, max = 200) =>
@@ -112,9 +116,9 @@ async function sendWa(target: string, text: string) {
   return !res.ok || out.status === false ? out.reason || `Fonnte menolak (${res.status})` : '';
 }
 
-/** Kabar singkat ke nomor Unit Dokumen, bila diatur. */
+/** Kabar singkat ke nomor-nomor Unit Dokumen (DOKUMEN_WA, dipisah koma), bila diatur. */
 async function tellStaff(text: string) {
-  const to = waNumber(Deno.env.get('DOKUMEN_WA') ?? '');
+  const to = staffNumbers();
   if (to) await sendWa(to, text);
 }
 

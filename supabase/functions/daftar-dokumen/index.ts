@@ -2,7 +2,8 @@
 // Setiap berkas menjadi satu data di menu TTD EVP dengan tahap "Didaftarkan unit". Setelah
 // staf menerima dokumen fisiknya, PIC dikabari lewat fungsi "kabari-pic".
 //
-// Bila secret DOKUMEN_WA diisi (nomor WA Unit Dokumen), pendaftaran baru dikabarkan ke sana.
+// Bila secret DOKUMEN_WA diisi (nomor WA Unit Dokumen, boleh beberapa dipisah koma), pendaftaran
+// baru dikabarkan ke sana.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const SITE = Deno.env.get('SITE_URL') || 'https://dokumenbylt.my.id';
@@ -28,6 +29,10 @@ function waNumber(kontak = '') {
   return digits.startsWith('0') ? '62' + digits.slice(1) : digits;
 }
 
+/** Nomor-nomor WA Unit Dokumen dari secret DOKUMEN_WA, mis. "0812..., 0813...". */
+const staffNumbers = () =>
+  [...new Set((Deno.env.get('DOKUMEN_WA') ?? '').split(/[,;\n]/).map((n) => waNumber(n)).filter(Boolean))].join(',');
+
 const clean = (s: unknown, max = 200) =>
   String(s ?? '')
     .replace(/\s+/g, ' ')
@@ -35,7 +40,7 @@ const clean = (s: unknown, max = 200) =>
     .slice(0, max);
 
 async function tellStaff(text: string) {
-  const to = waNumber(Deno.env.get('DOKUMEN_WA') ?? '');
+  const to = staffNumbers();
   const token = Deno.env.get('FONNTE_TOKEN');
   if (!to || !token) return;
   const body = new FormData();

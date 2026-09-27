@@ -871,6 +871,12 @@ tr:hover td.actions .btn, td.actions .btn:focus-visible { opacity: 1; }
 .choice input { width: auto; min-height: 0; padding: 0; margin: 0; border: 0; box-shadow: none; accent-color: var(--accent); flex: none; }
 .choice input:focus { box-shadow: none; }
 .public-card .notice { margin: 0; }
+.pre-line { white-space: pre-line; margin: 6px 0 0; }
+.public-card b.text { color: var(--text); }
+.foto-resi { display: flex; }
+.foto-prev { position: relative; }
+.foto-prev img { display: block; max-width: 100%; max-height: 260px; border-radius: 14px; }
+.foto-prev .icon-btn { position: absolute; top: 8px; right: 8px; background: var(--surface); box-shadow: var(--card-shadow); }
 .trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 .track { list-style: none; margin: 12px 0 4px; padding: 0; display: grid; gap: 0; }
 .track li { display: flex; gap: 14px; align-items: flex-start; position: relative; padding-bottom: 18px; color: var(--muted); }

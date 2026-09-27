@@ -79,14 +79,15 @@ const supabase: SupabaseClient | null = url && key ? createClient(url, key) : nu
 
 export type NotifyResult = { sent: true; target: string } | { sent: false; reason: string };
 
-/** false: tidak perlu WA. "instant": peminjam drone, langsung. `{ stage }`: PIC dokumen, digabung per nomor. */
+/** false: tidak perlu WA. "instant": peminjam drone atau pemohon/kurir paket, langsung. `{ stage }`: PIC dokumen, digabung per nomor. */
 export type NotifyKind = false | 'instant' | { stage: string };
 
 function shouldNotify(mod: ModuleId, rec: DocRecord, prev?: DocRecord): NotifyKind {
   const def = moduleById(mod);
-  if (!def || !waNumber(rec.values.kontakPic)) return false;
+  if (!def) return false;
+  // Nomor tujuan (peminjam, pemohon, atau kurir) diperiksa oleh fungsi servernya.
   if (def.notifyOn) return def.notifyOn.includes(rec.status) && prev?.status !== rec.status ? 'instant' : false;
-  if (!def.notifyStages) return false;
+  if (!def.notifyStages || !waNumber(rec.values.kontakPic)) return false;
   // Data baru hanya dikabari bila memang baru (bukan data terhapus yang dikembalikan).
   if (!prev && rec.history.length > 1) return false;
   // Kabari tahap tertinggi yang baru dilewati, juga bila staf melompati tahap itu.
@@ -112,9 +113,16 @@ export async function sendNotify(ids: string[], stage: string, keepalive = false
   return r.ok ? { sent: true, target: String(r.data.target ?? '') } : { sent: false, reason: r.error };
 }
 
-/** Kabari peminjam drone sesuai tahapnya sekarang (dipanggil setelah staf memindah tahap). */
-export async function sendDroneNotify(id: string): Promise<NotifyResult> {
-  const r = await callFunction('pinjam-drone', { action: 'kabari', id });
+const INSTANT_FN: Partial<Record<ModuleId, string>> = { drone: 'pinjam-drone', pos: 'kirim-paket' };
+
+/**
+ * Kabari peminjam drone, atau pemohon/kurir paket, sesuai tahapnya sekarang (dipanggil setelah
+ * staf memindah tahap).
+ */
+export async function sendInstantNotify(mod: ModuleId, id: string): Promise<NotifyResult> {
+  const fn = INSTANT_FN[mod];
+  if (!fn) return { sent: false, reason: 'menu ini tidak mengirim WA' };
+  const r = await callFunction(fn, { action: 'kabari', id });
   return r.ok ? { sent: true, target: String(r.data.target ?? '') } : { sent: false, reason: r.error };
 }
 
@@ -359,8 +367,8 @@ export function useBackend() {
 
   const save = useCallback(
     async (mod: ModuleId, rec: DocRecord, prev?: DocRecord): Promise<NotifyKind> => {
-      // Peminjaman drone butuh token rahasia untuk tautan konfirmasi di WA peminjam.
-      if (mod === 'drone' && !prev && !rec.values.token)
+      // Drone dan paket butuh token rahasia untuk tautan pribadi di WA peminjam atau kurir.
+      if ((mod === 'drone' || mod === 'pos') && !rec.values.token)
         rec = { ...rec, values: { ...rec.values, token: crypto.randomUUID().replace(/-/g, '') } };
       setData((d) => withRecord(d, mod, rec));
       const notify = shouldNotify(mod, rec, prev);
