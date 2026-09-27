@@ -329,7 +329,7 @@ function CourierPage({ items }: { items: Pair[] }) {
   const allDone = finished.length === list.length;
   const notYet = list.filter((p) => idx(p.status) < READY_AT);
   // Paket yang resinya bisa diisi: sudah diambil, atau sudah ada resi dan sedang diperbaiki.
-  const toFill = list.filter((p) => picked.includes(p) || (editing && p.status === 'Resi diterima'));
+  const toFill = list.filter((p) => picked.includes(p) || (editing && finished.includes(p)));
   const field = (p: Paket) => resi[p.id] ?? { resi: editing ? p.resi ?? '' : '', biaya: editing ? p.biaya ?? '' : '' };
   const setField = (p: Paket, k: 'resi' | 'biaya', v: string) => setResi((x) => ({ ...x, [p.id]: { ...field(p), [k]: v } }));
 
@@ -454,12 +454,14 @@ function CourierPage({ items }: { items: Pair[] }) {
 
       {allDone && !editing && (
         <>
-          <p className="muted">Nomor resi sudah kami terima. Terima kasih.</p>
-          {list.some((p) => p.status === 'Resi diterima') && (
-            <button className="btn" onClick={() => setEditing(true)}>
-              Perbaiki nomor resi
-            </button>
-          )}
+          <p className="muted">
+            {list.every((p) => p.status === 'Resi dikirim ke user')
+              ? 'Nomor resi sudah kami terima dan diteruskan ke pemohon. Terima kasih.'
+              : 'Nomor resi sudah kami terima. Terima kasih.'}
+          </p>
+          <button className="btn" onClick={() => setEditing(true)}>
+            Perbaiki nomor resi
+          </button>
         </>
       )}
     </main>
