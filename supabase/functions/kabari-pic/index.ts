@@ -26,7 +26,9 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 
 function waNumber(kontak = '') {
-  const m = kontak.match(/(\+?62|0)8[\d\s.-]{7,14}/);
+  // Spasi, strip, titik, dan kurung di antara angka diabaikan, mis. "+62 822-8078-5113" atau "(0812) 345 678".
+  const joined = kontak.replace(/(?<=[\d+])[\s().-]+(?=[\d(])/g, '');
+  const m = joined.match(/(\+?62|0)8\d{7,13}/);
   if (!m) return '';
   const digits = m[0].replace(/\D/g, '');
   return digits.startsWith('0') ? '62' + digits.slice(1) : digits;
