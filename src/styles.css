@@ -920,3 +920,14 @@ tr:hover td.actions .btn, td.actions .btn:focus-visible { opacity: 1; }
   .berkas-fields { grid-template-columns: 1fr; }
   .berkas-item { padding: 14px 12px; gap: 10px; }
 }
+
+/* Rekap & cadangan */
+.sheet-body.backup section { padding: 4px 0 18px; border-bottom: 1px solid var(--hair); margin-bottom: 18px; }
+.sheet-body.backup section:last-child { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.sheet-body.backup h3 { margin: 0 0 6px; font-size: 1.02rem; }
+.sheet-body.backup section > p { margin: 0 0 12px; }
+.notice.ok { background: var(--ok-soft); color: var(--ok); }
+.backup-list { list-style: none; margin: 0; padding: 0; }
+.backup-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 0.94rem; }
+.backup-list li:last-child { border-bottom: 0; }
+.backup-list a.btn { text-decoration: none; }

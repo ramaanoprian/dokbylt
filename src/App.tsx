@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, FileText, KeyRound, LogOut, Menu as Menu2, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
+import { DatabaseBackup, Download, FileText, KeyRound, LogOut, Menu as Menu2, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
 import { Menu } from './Menu';
 import { MODULES, moduleById, type ModuleId } from './modules';
 import { isOnline, useBackend, type DataStore } from './backend';
@@ -11,6 +11,7 @@ import { LoginPage, NamePrompt } from './LoginPage';
 import { CommandPalette } from './CommandPalette';
 import { ReminderBell } from './ReminderBell';
 import { StaffDialog } from './StaffDialog';
+import { BackupDialog } from './BackupDialog';
 import { collectReminders } from './reminders';
 import { useToast } from './toast';
 import { exportJson, isDone, readPref, writePref } from './util';
@@ -27,6 +28,7 @@ export default function App() {
   const [page, setPage] = useState<Page>(readHash);
   const [navOpen, setNavOpen] = useState(false);
   const [staffOpen, setStaffOpen] = useState(false);
+  const [backupOpen, setBackupOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [openId, setOpenId] = useState<string | undefined>();
   const [dark, setDark] = useState(() => {
@@ -208,7 +210,10 @@ export default function App() {
       { icon: <Download size={16} />, label: 'Unduh cadangan data', run: () => exportJson(data) },
       ...(!isOnline ? [{ icon: <Upload size={16} />, label: 'Pulihkan dari cadangan', run: () => fileRef.current?.click() }] : []),
     ],
-    isOnline && be.isAdmin ? [{ icon: <Users size={16} />, label: 'Kelola peran staf', run: () => setStaffOpen(true) }] : [],
+    [
+      ...(isOnline ? [{ icon: <DatabaseBackup size={16} />, label: 'Rekap & cadangan', run: () => setBackupOpen(true) }] : []),
+      ...(isOnline && be.isAdmin ? [{ icon: <Users size={16} />, label: 'Kelola peran staf', run: () => setStaffOpen(true) }] : []),
+    ],
     isOnline
       ? [
           { icon: <KeyRound size={16} />, label: 'Ganti kata sandi', run: changePassword },
@@ -353,6 +358,7 @@ export default function App() {
       {staffOpen && (
         <StaffDialog meId={be.user.id} load={be.listStaff} setRole={be.setStaffRole} onClose={closeStaff} />
       )}
+      {backupOpen && <BackupDialog data={data} onClose={() => setBackupOpen(false)} />}
       {paletteOpen && (
         <CommandPalette
           data={data}
