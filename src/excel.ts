@@ -69,6 +69,12 @@ export async function exportRekap(data: DataStore, month: string) {
   await write([summary, ...sheets] as never).toFile(`rekap-dokumen-${month}.xlsx`);
 }
 
+/** Cadangan lengkap: semua data semua menu, satu sheet per menu. */
+export async function exportAll(data: DataStore) {
+  const write = await writer();
+  await write(MODULES.map((m) => sheetOf(m, data[m.id])) as never).toFile(`cadangan-dokumen-${today()}.xlsx`);
+}
+
 /** File contoh berisi judul kolom yang dikenali saat impor. */
 export async function downloadTemplate(mod: ModuleDef) {
   const write = await writer();
