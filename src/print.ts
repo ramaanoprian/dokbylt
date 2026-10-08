@@ -101,7 +101,7 @@ export function printDisposition(mod: ModuleDef, r: DocRecord) {
 <div class="sub">Surat Masuk</div>
 <table class="grid">
   <tr><td style="width:50%"><b>Surat dari</b><br>${esc(v.asal || '')}</td><td><b>Diterima tanggal</b><br>${esc(fmtDate(v.tanggalTerima))}</td></tr>
-  <tr><td><b>Nomor surat</b><br>${esc(v.nomorSurat || '–')}</td><td><b>Sifat</b><br><span class="box"></span>Biasa &nbsp; <span class="box"></span>Segera &nbsp; <span class="box"></span>Rahasia</td></tr>
+  <tr><td><b>Nomor surat</b><br>${esc(v.nomorSurat || '–')}${v.tanggalSurat ? `<br><b>Tanggal surat</b><br>${esc(fmtDate(v.tanggalSurat))}` : ''}</td><td><b>Sifat</b><br><span class="box"></span>Biasa &nbsp; <span class="box"></span>Segera &nbsp; <span class="box"></span>Rahasia</td></tr>
   <tr><td colspan="2"><b>Perihal</b><br>${esc(v.perihal || '')}</td></tr>
   <tr><td><b>Diteruskan kepada</b>${checks}${other}</td><td><b>Isi disposisi</b><div class="lines"><div></div><div></div><div></div><div></div><div></div><div></div></div></td></tr>
   <tr><td><b>Tanggal penyelesaian</b><br>${esc(v.tenggat ? fmtDate(v.tenggat) : '')}</td><td><b>Paraf</b><br><br><br></td></tr>

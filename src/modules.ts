@@ -121,6 +121,7 @@ export const MODULES: ModuleDef[] = [
       { key: 'tanggalTerima', label: 'Tanggal diterima', type: 'date', required: true, inTable: true },
       tenggat('Batas surat harus sudah didistribusikan'),
       { key: 'nomorSurat', label: 'Nomor surat', type: 'text', inTable: true },
+      { key: 'tanggalSurat', label: 'Tanggal surat', type: 'date', inTable: true },
       { key: 'asal', label: 'Asal / pengirim', type: 'text', required: true, inTable: true },
       { key: 'perihal', label: 'Perihal', type: 'text', required: true, inTable: true },
       {
