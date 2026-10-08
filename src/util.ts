@@ -1,5 +1,6 @@
 import { OTHER, otherKey, type Field, type ModuleDef } from './modules';
 import type { DocRecord } from './backend';
+import { siteTrackUrl } from './track';
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
@@ -134,7 +135,6 @@ export function waNumber(kontak = '') {
 
 export const emailOf = (kontak = '') => kontak.match(/[\w.+-]+@[\w-]+\.[\w.-]+/)?.[0] ?? '';
 
-/** Pesan untuk PIC unit bahwa dokumennya sudah ditandatangani EVP. */
 /** Satu baris dokumen untuk pesan WA, mis. `RAB "Pengadaan bogie"`. */
 export function docLine(v: Record<string, string>) {
   const jenis = v.jenis === 'Lainnya' ? v.jenisLainnya || '' : v.jenis || '';
@@ -146,9 +146,10 @@ export const RECEIVED_STAGE = 'Diterima dari unit';
 
 /**
  * Pesan WA untuk PIC unit: satu dokumen, atau daftar bila beberapa dokumen sekaligus.
- * Sama dengan fungsi message di supabase/functions/kabari-pic.
+ * `codes` berisi kode lacak dokumen-dokumen itu (lihat src/track.ts); bila ada, pesan ditutup
+ * dengan satu tautan pantau status. Sama dengan fungsi message di supabase/functions/kabari-pic.
  */
-export function signedMessage(docs: Record<string, string>[], stage = '') {
+export function signedMessage(docs: Record<string, string>[], stage = '', codes: string[] = []) {
   const v = docs[0] ?? {};
   const unit = v.unit ? ` dari unit ${v.unit}` : '';
   const received = stage === RECEIVED_STAGE;
@@ -165,16 +166,17 @@ export function signedMessage(docs: Record<string, string>[], stage = '') {
     received
       ? 'Kami akan menginformasikan lagi setelah dokumen ditandatangani.'
       : 'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
+    ...(codes.length ? ['', `Pantau status: ${siteTrackUrl(codes)}`] : []),
     '',
     'Terima kasih,',
     'Unit Dokumen Balai Yasa Lahat',
   ].join('\n');
 }
 
-/** Tautan WA untuk mengabari PIC, atau kosong bila nomornya belum diisi. */
-export function notifyUrl(docs: Record<string, string>[], stage = '') {
+/** Tautan WA untuk mengabari PIC, atau kosong bila nomornya belum diisi. `codes`: kode lacak dokumennya. */
+export function notifyUrl(docs: Record<string, string>[], stage = '', codes: string[] = []) {
   const wa = waNumber(docs[0]?.kontakPic);
-  return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(docs, stage))}` : '';
+  return wa ? `https://wa.me/${wa}?text=${encodeURIComponent(signedMessage(docs, stage, codes))}` : '';
 }
 
 /** Sama dengan pesan tahap "Resi dikirim ke user" di supabase/functions/kirim-paket. */

@@ -5,7 +5,12 @@
 // Fungsi ini hanya mengirim ke nomor yang tercatat di data itu sendiri, dan hanya bila
 // datanya memang sudah sampai di tahap yang dikabarkan, jadi tidak bisa dipakai untuk
 // mengirim pesan bebas.
+//
+// Setiap pesan ditutup dengan tautan halaman lacak (#lacak/<kode>) agar PIC bisa memantau
+// posisi dokumennya sendiri tanpa login.
 import { createClient } from 'npm:@supabase/supabase-js@2';
+
+const SITE = Deno.env.get('SITE_URL') || 'https://dokumenbylt.my.id';
 
 // Urutan tahap dan tahap yang dikabari. Data dianggap sudah melewati sebuah tahap bila
 // tahapnya sekarang sama atau sesudahnya (staf kadang melompat langsung ke tahap akhir).
@@ -39,8 +44,11 @@ function docLine(v: Record<string, string>) {
   return [jenis, v.perihal ? `"${v.perihal}"` : ''].filter(Boolean).join(' ') || 'Dokumen';
 }
 
+/** Kode lacak: 10 karakter heksadesimal pertama dari id, huruf besar. Sama dengan trackCode di src/track.ts. */
+const trackCode = (id: string) => id.replace(/-/g, '').slice(0, 10).toUpperCase();
+
 // Sama dengan signedMessage di src/util.ts.
-function message(docs: Record<string, string>[], stage: string) {
+function message(docs: Record<string, string>[], stage: string, codes: string[]) {
   const v = docs[0] ?? {};
   const unit = v.unit ? ` dari unit ${v.unit}` : '';
   const received = stage === RECEIVED;
@@ -57,6 +65,7 @@ function message(docs: Record<string, string>[], stage: string) {
     received
       ? 'Kami akan menginformasikan lagi setelah dokumen ditandatangani.'
       : 'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
+    ...(codes.length ? ['', `Pantau status: ${SITE}/#lacak/${codes.join(',')}`] : []),
     '',
     'Terima kasih,',
     'Unit Dokumen Balai Yasa Lahat',
@@ -88,14 +97,14 @@ Deno.serve(async (req) => {
   const { data: recs, error } = await db.from('records').select('id, module, status, values').in('id', ids);
   if (error || !recs?.length) return json({ error: 'Data tidak ditemukan' }, 404);
 
-  const groups = new Map<string, Record<string, string>[]>();
+  const groups = new Map<string, { values: Record<string, string>; code: string }[]>();
   recs.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
   for (const rec of recs) {
     const order = STATUSES[rec.module];
     if (!order || !STAGES[rec.module].includes(stage) || order.indexOf(rec.status) < order.indexOf(stage)) continue;
     const values = (rec.values ?? {}) as Record<string, string>;
     const target = waNumber(values.kontakPic);
-    if (target) groups.set(target, [...(groups.get(target) ?? []), values]);
+    if (target) groups.set(target, [...(groups.get(target) ?? []), { values, code: trackCode(rec.id) }]);
   }
   if (!groups.size) return json({ error: 'Belum ada dokumen yang perlu dikabari' }, 409);
 
@@ -104,7 +113,7 @@ Deno.serve(async (req) => {
   for (const [target, docs] of groups) {
     const body = new FormData();
     body.set('target', target);
-    body.set('message', message(docs, stage));
+    body.set('message', message(docs.map((d) => d.values), stage, docs.map((d) => d.code)));
     body.set('countryCode', '62');
     const res = await fetch('https://api.fonnte.com/send', { method: 'POST', headers: { Authorization: token }, body });
     const out = await res.json().catch(() => ({}));

@@ -1,11 +1,14 @@
 // Halaman publik #daftar-dokumen, tanpa login: unit mendaftarkan dokumen yang butuh tanda
 // tangan EVP sebelum mengantarnya ke Unit Dokumen. Satu pengantar bisa mendaftarkan beberapa
 // berkas sekaligus. PIC dikabari lewat WA saat dokumen diterima dan saat sudah ditandatangani.
+// Setelah terdaftar, setiap berkas mendapat kode lacak untuk memantau statusnya di #lacak/<kode>.
 import { useEffect, useState, type FormEvent } from 'react';
-import { Check, Loader2, PenLine, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, Copy, Loader2, PenLine, Plus, ScanSearch, Trash2 } from 'lucide-react';
 import { callFunction } from './backend';
 import { OTHER, UNITS, moduleById } from './modules';
 import { readPref } from './util';
+import { trackCode } from './track';
+import './track.css';
 
 export const isDocRoute = () => location.hash.startsWith('#daftar-dokumen');
 
@@ -20,12 +23,36 @@ interface Berkas {
 
 const empty = (): Berkas => ({ jenis: '', perihal: '' });
 
+/** Kode lacak satu berkas dengan tombol salin. */
+function CodeChip({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(t);
+  }, [copied]);
+  return (
+    <button
+      type="button"
+      className="lk-code"
+      title="Salin kode lacak"
+      onClick={() => navigator.clipboard?.writeText(code).then(() => setCopied(true), () => undefined)}
+    >
+      <span>Kode lacak</span>
+      <b>{code}</b>
+      {copied ? <Check size={14} strokeWidth={2.6} className="ok" /> : <Copy size={14} />}
+    </button>
+  );
+}
+
 export function DocPublic() {
   const [f, setF] = useState<Record<string, string>>({});
   const [items, setItems] = useState<Berkas[]>([empty()]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<Berkas[] | null>(null);
+  // Id data hasil pendaftaran (urutannya sama dengan berkas), untuk kode lacak.
+  const [ids, setIds] = useState<string[]>([]);
 
   useEffect(() => {
     const dark = readPref('theme', '');
@@ -43,9 +70,13 @@ export function DocPublic() {
     setError('');
     const r = await callFunction('daftar-dokumen', { action: 'daftar', form: f, berkas: items, website: f.website });
     setSending(false);
-    if (r.ok) setDone(items);
-    else setError(r.error);
+    if (r.ok) {
+      setIds(Array.isArray(r.data.ids) ? r.data.ids.map(String) : []);
+      setDone(items);
+    } else setError(r.error);
   };
+
+  const codes = ids.length === done?.length ? ids.map((id) => trackCode({ id })) : [];
 
   return (
     <div className="public" data-mod="evp">
@@ -65,7 +96,7 @@ export function DocPublic() {
             <Check size={28} strokeWidth={2.6} />
           </span>
           <h1>{done.length > 1 ? `${done.length} dokumen terdaftar.` : 'Dokumen terdaftar.'}</h1>
-          <ol className="doc-list">
+          <ol className={'doc-list' + (codes.length ? ' lk-doc-list' : '')}>
             {done.map((b, i) => (
               <li key={i}>
                 <b>{b.perihal}</b>
@@ -73,6 +104,14 @@ export function DocPublic() {
                   {b.jenis === OTHER ? b.jenisLainnya : b.jenis}
                   {b.nomor ? ` · ${b.nomor}` : ''}
                 </span>
+                {codes[i] && (
+                  <span className="lk-doc-code">
+                    <CodeChip code={codes[i]} />
+                    <a className="link" href={`#lacak/${codes[i]}`}>
+                      Lacak <ChevronRight size={15} />
+                    </a>
+                  </span>
+                )}
               </li>
             ))}
           </ol>
@@ -80,10 +119,25 @@ export function DocPublic() {
             Silakan antar dokumen fisiknya ke Unit Dokumen. WA dikirim ke {f.kontakPic} saat dokumen kami terima, lalu
             lagi saat sudah ditandatangani EVP.
           </p>
+          {codes.length > 0 && (
+            <div className="lk-doc-track">
+              <ScanSearch size={20} strokeWidth={1.8} aria-hidden />
+              <span className="grow">
+                <b>Pantau statusnya kapan saja.</b>
+                <span className="muted small block">
+                  Simpan {codes.length > 1 ? 'kode-kode' : 'kode'} lacak di atas, atau buka halaman lacak sekarang.
+                </span>
+              </span>
+              <a className="pill-btn" href={`#lacak/${codes.join(',')}`}>
+                {codes.length > 1 ? 'Lacak semua' : 'Lacak dokumen'}
+              </a>
+            </div>
+          )}
           <button
             className="btn"
             onClick={() => {
               setDone(null);
+              setIds([]);
               setItems([empty()]);
             }}
           >

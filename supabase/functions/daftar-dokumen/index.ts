@@ -1,6 +1,7 @@
 // Pendaftaran dokumen TTD EVP oleh unit, tanpa login (formulir #daftar-dokumen lewat QR).
 // Setiap berkas menjadi satu data di menu TTD EVP dengan tahap "Didaftarkan unit". Setelah
 // staf menerima dokumen fisiknya, PIC dikabari lewat fungsi "kabari-pic".
+// Jawaban berisi id setiap data agar halaman pendaftaran bisa menampilkan kode lacaknya (#lacak/<kode>).
 //
 // Bila secret DOKUMEN_WA diisi (nomor WA Unit Dokumen, boleh beberapa dipisah koma), pendaftaran
 // baru dikabarkan ke sana.
@@ -91,6 +92,8 @@ Deno.serve(async (req) => {
       const values: Record<string, string> = { ...common, ...b };
       for (const k of Object.keys(values)) if (!values[k]) delete values[k];
       return {
+        // Id dibuat di sini agar urutannya pasti sama dengan urutan berkas di formulir.
+        id: crypto.randomUUID(),
         module: 'evp',
         status: 'Didaftarkan unit',
         values,
@@ -109,7 +112,7 @@ Deno.serve(async (req) => {
         `Buka: ${SITE}/#evp`,
       ].join('\n'),
     );
-    return json({ ok: true, count: rows.length });
+    return json({ ok: true, count: rows.length, ids: rows.map((r: { id: string }) => r.id) });
   } catch (e) {
     console.error(e);
     return json({ error: 'Terjadi kesalahan di server' }, 500);
