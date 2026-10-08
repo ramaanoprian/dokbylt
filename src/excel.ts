@@ -140,7 +140,7 @@ function toDate(v: Cell): string {
 // Judul kolom dari register lama (Excel buku agenda) yang namanya berbeda dengan form.
 const ALIASES: Record<string, string[]> = {
   unitpengusul: ['unit'],
-  tanggalsurat: ['tanggal', 'tanggalTerima', 'tanggalMasuk'],
+  tanggalsurat: ['tanggalSurat', 'tanggal', 'tanggalTerima', 'tanggalMasuk'],
   tanggalagenda: ['tanggalMasuk', 'tanggalTerima', 'tanggal'],
   batasttd: ['tenggat'],
   nosuratdokumen: ['nomor', 'nomorSurat'],
