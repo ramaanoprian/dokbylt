@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, FileSpreadsheet, Plus } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronRight, FileChartColumn, FileSpreadsheet, Plus } from 'lucide-react';
 import { exportRekap } from './excel';
 import { MODULES, UNITS, moduleById, type ModuleId } from './modules';
 import type { Activity, DataStore } from './backend';
@@ -18,13 +18,15 @@ interface Props {
   activity: Activity[];
   loading: boolean;
   go: (id: ModuleId | 'aktivitas', openId?: string) => void;
+  /** Buka dialog laporan bulanan (PDF). */
+  onReport?: () => void;
 }
 
 const label = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.keperluan || v.tujuan || v.asal || '';
 const dayKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-export function Overview({ data, activity, loading, go }: Props) {
+export function Overview({ data, activity, loading, go, onReport }: Props) {
   const now = new Date();
   const month = dayKey(now).slice(0, 7);
   const evp = moduleById('evp');
@@ -126,6 +128,14 @@ export function Overview({ data, activity, loading, go }: Props) {
   return (
     <>
       <LocalNav title="Ringkasan">
+        {onReport && (
+          <button type="button" className="lnav-link" onClick={onReport} title="Buat laporan bulanan (PDF)">
+            <FileChartColumn size={15} />
+            <span>
+              Laporan<span className="hide-sm"> bulanan</span>
+            </span>
+          </button>
+        )}
         <Menu
           triggerClass="pill-btn"
           trigger={
