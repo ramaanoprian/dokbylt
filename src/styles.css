@@ -519,6 +519,14 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .search input { padding-left: 42px; border-color: transparent; background: var(--surface); box-shadow: var(--card-shadow); }
 .search input:focus { border-color: var(--blue); }
 .controls .segmented { margin-left: auto; }
+.sort-ctl { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
+.sort-ctl + .segmented { margin-left: 0; }
+.controls .sort-ctl select { min-width: 0; max-width: 230px; border-color: transparent; background-color: var(--surface); box-shadow: var(--card-shadow); }
+.th-sort { all: unset; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; color: inherit; font: inherit; border-radius: 4px; }
+.th-sort:hover, .th-sort.on { color: var(--text); }
+.th-sort:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.th-sort-hint { opacity: 0; transition: opacity 0.15s; }
+.th-sort:hover .th-sort-hint, .th-sort:focus-visible .th-sort-hint { opacity: 0.6; }
 .segmented { display: inline-flex; background: var(--fill); border-radius: 10px; padding: 2px; }
 .segmented button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; min-height: 32px; padding: 0 14px; border-radius: 8px; cursor: pointer; font-size: 0.875rem; color: var(--text); transition: background 0.2s, box-shadow 0.2s; }
 .segmented button.on { background: var(--surface); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); font-weight: 500; }
