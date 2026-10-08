@@ -145,6 +145,13 @@ export default function ReportDialog({ data, activity, userName, onClose }: Prop
       d: countDelta(total.overdue, prev.overdue, prevName, hasPrev, false),
     },
   ];
+  // Angka akhir untuk pembaca layar; angka yang beranimasi tidak diumumkan satu per satu.
+  const num = (n: number) => n.toLocaleString('id-ID');
+  const spoken = rep.empty
+    ? `${monthLabel(month)}: belum ada data.`
+    : `${monthLabel(month)}: masuk ${num(total.masuk)}, selesai ${num(total.selesai)}, masih berjalan ${num(total.berjalan)}, ` +
+      `rata-rata selesai ${avgNow === undefined ? 'belum ada' : fmtDays(avgNow)}, ` +
+      `tepat waktu ${rate === undefined ? 'belum ada' : `${Math.round(rate)}%`}, lewat tenggat ${num(total.overdue)}.`;
 
   return (
     <div className={'overlay rp-overlay' + (closing ? ' closing' : '')} onMouseDown={(e) => e.target === e.currentTarget && close()}>
@@ -197,7 +204,10 @@ export default function ReportDialog({ data, activity, userName, onClose }: Prop
             })}
           </div>
 
-          <section className="rp-preview" aria-live="polite">
+          <p className="rp-sr" aria-live="polite">
+            {spoken}
+          </p>
+          <section className="rp-preview">
             <div className="rp-preview-head">
               <h3>{monthLabel(month)}</h3>
               <span className="muted small">

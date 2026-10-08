@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DatabaseBackup, Download, FileChartColumn, FileText, KeyRound, LogOut, Menu as Menu2, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
 import { Menu } from './Menu';
 import { MODULES, moduleById, type ModuleId } from './modules';
@@ -15,9 +15,7 @@ import { BackupDialog } from './BackupDialog';
 import { collectReminders } from './reminders';
 import { useToast } from './toast';
 import { exportJson, isDone, readPref, writePref } from './util';
-
-// Laporan bulanan dimuat saat dibuka saja agar aplikasi tetap ringan.
-const ReportDialog = lazy(() => import('./report/ReportDialog'));
+import { ReportLoader } from './report/LazyReport';
 
 type Page = 'ringkasan' | 'aktivitas' | ModuleId;
 
@@ -366,11 +364,7 @@ export default function App() {
         <StaffDialog meId={be.user.id} load={be.listStaff} setRole={be.setStaffRole} onClose={closeStaff} />
       )}
       {backupOpen && <BackupDialog data={data} onClose={() => setBackupOpen(false)} />}
-      {reportOpen && (
-        <Suspense fallback={null}>
-          <ReportDialog data={data} activity={be.activity} userName={userName} onClose={closeReport} />
-        </Suspense>
-      )}
+      {reportOpen && <ReportLoader data={data} activity={be.activity} userName={userName} onClose={closeReport} />}
       {paletteOpen && (
         <CommandPalette
           data={data}
