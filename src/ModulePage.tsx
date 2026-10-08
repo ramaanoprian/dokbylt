@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Columns3, List, Paperclip, Plus, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, Columns3, List, Paperclip, Plus, Search } from 'lucide-react';
 import type { ModuleDef } from './modules';
 import { attachmentsOf, sendDroneNotify, type DocRecord, type NotifyKind } from './backend';
 import { cancelNotify, queueNotify } from './notifyQueue';
@@ -49,6 +49,35 @@ type View = 'tabel' | 'papan';
 /** Kolom yang paling menggambarkan data; dipakai sebagai judul kartu di HP. */
 const TITLE_KEYS = ['perihal', 'kegiatan', 'uraian', 'keperluan', 'tujuan', 'asal', 'pengirim'];
 
+type Dir = 'asc' | 'desc';
+/** Kunci urutan: key field, atau salah satu kolom tambahan di bawah. */
+const EXTRA_SORTS = [
+  { key: '_tahap', label: 'Tahap' },
+  { key: '_tenggat', label: 'Tenggat' },
+  { key: '_diubah', label: 'Terakhir diubah' },
+];
+const collator = new Intl.Collator('id', { numeric: true, sensitivity: 'base' });
+
+/** Nilai yang dibandingkan saat mengurutkan; string kosong selalu ditaruh di bawah. */
+function sortValue(mod: ModuleDef, r: DocRecord, key: string): string | number {
+  if (key === '_tahap') return mod.statuses.indexOf(r.status);
+  if (key === '_tenggat') return isDone(mod, r) ? '' : (deadlineOf(mod, r) ?? '');
+  if (key === '_diubah') return r.updatedAt;
+  const f = mod.fields.find((x) => x.key === key);
+  return f ? (f.type === 'date' ? (r.values[key] ?? '') : shown(f, r.values)) : '';
+}
+
+function sortRows(mod: ModuleDef, rows: DocRecord[], key: string, dir: Dir) {
+  const sign = dir === 'asc' ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const va = sortValue(mod, a, key);
+    const vb = sortValue(mod, b, key);
+    if (va === '' || vb === '') return va === vb ? 0 : va === '' ? 1 : -1;
+    const c = typeof va === 'number' && typeof vb === 'number' ? va - vb : collator.compare(String(va), String(vb));
+    return c * sign || b.createdAt.localeCompare(a.createdAt);
+  });
+}
+
 export function ModulePage({
   mod,
   rows,
@@ -69,6 +98,20 @@ export function ModulePage({
   const [editing, setEditing] = useState<Editing>(null);
   const [view, setViewState] = useState<View>(() => readPref(`view:${mod.id}`, 'tabel') as View);
   const cols = mod.fields.filter((f) => f.inTable);
+  const sortOptions = [...cols.map((c) => ({ key: c.key, label: c.label })), ...EXTRA_SORTS];
+  const [sort, setSortState] = useState<{ key: string; dir: Dir }>(() => {
+    const [key, dir] = readPref(`sort:${mod.id}`, '').split(':');
+    return sortOptions.some((o) => o.key === key) ? { key, dir: dir === 'asc' ? 'asc' : 'desc' } : { key: mod.dateField, dir: 'desc' };
+  });
+  const setSort = (key: string, dir: Dir) => {
+    setSortState({ key, dir });
+    writePref(`sort:${mod.id}`, `${key}:${dir}`);
+  };
+  // Klik judul kolom: kolom baru mulai dari terbaru/Z-A untuk tanggal, A-Z untuk teks; klik lagi membalik arah.
+  const sortBy = (key: string) => {
+    if (sort.key === key) setSort(key, sort.dir === 'asc' ? 'desc' : 'asc');
+    else setSort(key, mod.fields.find((f) => f.key === key)?.type === 'date' || key === '_diubah' ? 'desc' : 'asc');
+  };
 
   const setView = (v: View) => {
     setViewState(v);
@@ -100,7 +143,7 @@ export function ModulePage({
 
   const searched = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return rows.filter(
+    const hits = rows.filter(
       (r) =>
         !needle ||
         Object.values(r.values).some((v) =>
@@ -109,15 +152,14 @@ export function ModulePage({
             .includes(needle),
         ),
     );
-  }, [rows, q]);
+    return sortRows(mod, hits, sort.key, sort.dir);
+  }, [rows, q, mod, sort]);
 
   const filtered = useMemo(
     () =>
-      searched
-        .filter((r) =>
-          statusFilter === 'semua' ? true : statusFilter === 'aktif' ? !isDone(mod, r) : r.status === statusFilter,
-        )
-        .sort((a, b) => (b.values[mod.dateField] ?? '').localeCompare(a.values[mod.dateField] ?? '')),
+      searched.filter((r) =>
+        statusFilter === 'semua' ? true : statusFilter === 'aktif' ? !isDone(mod, r) : r.status === statusFilter,
+      ),
     [searched, statusFilter, mod],
   );
 
@@ -234,6 +276,27 @@ export function ModulePage({
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
+          <div className="sort-ctl">
+            <select
+              aria-label="Urutkan menurut"
+              value={sort.key}
+              onChange={(e) => setSort(e.target.value, sort.dir)}
+            >
+              {sortOptions.map((o) => (
+                <option key={o.key} value={o.key}>
+                  Urutkan: {o.label}
+                </option>
+              ))}
+            </select>
+            <button
+              className="icon-btn"
+              onClick={() => setSort(sort.key, sort.dir === 'asc' ? 'desc' : 'asc')}
+              title={sort.dir === 'asc' ? 'Naik (A-Z, terlama dulu)' : 'Turun (Z-A, terbaru dulu)'}
+              aria-label={sort.dir === 'asc' ? 'Urutan naik, klik untuk membalik' : 'Urutan turun, klik untuk membalik'}
+            >
+              {sort.dir === 'asc' ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+            </button>
+          </div>
           <div className="segmented" role="tablist" aria-label="Tampilan">
             <button className={view === 'tabel' ? 'on' : ''} onClick={() => setView('tabel')} title="Tabel">
               <List size={15} /> <span className="hide-sm">Daftar</span>
@@ -301,10 +364,21 @@ export function ModulePage({
               <table>
                 <thead>
                   <tr>
-                    {cols.map((c) => (
-                      <th key={c.key}>{c.label}</th>
-                    ))}
-                    <th>Tahap</th>
+                    {[...cols.map((c) => ({ key: c.key, label: c.label })), { key: '_tahap', label: 'Tahap' }].map((c) => {
+                      const on = sort.key === c.key;
+                      return (
+                        <th key={c.key} aria-sort={on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined}>
+                          <button className={'th-sort' + (on ? ' on' : '')} onClick={() => sortBy(c.key)}>
+                            {c.label}
+                            {on ? (
+                              sort.dir === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
+                            ) : (
+                              <ArrowUpDown size={13} className="th-sort-hint" />
+                            )}
+                          </button>
+                        </th>
+                      );
+                    })}
                     <th />
                   </tr>
                 </thead>
