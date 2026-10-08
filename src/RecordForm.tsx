@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, MessageCircle, Printer, X } from 'lucide-react';
-import { OTHER, firstStatus, otherKey, type ModuleDef } from './modules';
+import { OTHER, firstStatus, otherKey, stageNeeds, type ModuleDef } from './modules';
 import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
+import { trackCode } from './track';
 import { daysUntil, defaultDue, notifyUrl, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
 import { Icon } from './icons';
 import { stageClass } from './stats';
@@ -31,7 +32,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
   const [values, setValues] = useState<Record<string, string>>(() => {
     if (record) return { ...record.values };
     const init: Record<string, string> = {};
-    for (const f of mod.fields) if (f.type === 'date' && f.key !== 'tenggat') init[f.key] = today();
+    for (const f of mod.fields) if (f.type === 'date' && f.key !== 'tenggat' && !f.blank) init[f.key] = today();
     const due = defaultDue(mod, init);
     if (due) init.tenggat = due;
     return init;
@@ -40,12 +41,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
   const [dueAuto, setDueAuto] = useState(() => !record || (!record.values.tenggat && !!mod.dueDays));
   const [status, setStatus] = useState(targetStatus ?? record?.status ?? firstStatus(mod));
 
-  const needed = new Set([
-    ...mod.fields.filter((f) => f.required).map((f) => f.key),
-    ...mod.statuses
-      .slice(0, mod.statuses.indexOf(status) + 1)
-      .flatMap((s) => mod.requiredForStatus?.[s] ?? []),
-  ]);
+  const needed = new Set([...mod.fields.filter((f) => f.required).map((f) => f.key), ...stageNeeds(mod, status, record)]);
   const missing = mod.fields.filter((f) => needed.has(f.key) && !values[f.key]?.trim());
   const otherMissing = mod.fields.filter((f) => values[f.key] === OTHER && !values[otherKey(f.key)]?.trim());
   const blocked = missing.length + otherMissing.length > 0;
@@ -304,7 +300,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
                 type="button"
                 className="btn wa"
                 disabled={!waNumber(values.kontakPic) || mod.statuses.indexOf(status) < mod.statuses.indexOf(mod.notifyStatus)}
-                onClick={() => window.open(notifyUrl([values]), '_blank')}
+                onClick={() => window.open(notifyUrl([values], '', record ? [trackCode({ id })] : []), '_blank')}
               >
                 <MessageCircle size={16} /> Kirim via WA
               </button>

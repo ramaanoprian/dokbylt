@@ -1,6 +1,6 @@
 import { OTHER, otherKey, type Field, type ModuleDef } from './modules';
 import type { DocRecord } from './backend';
-import { siteTrackUrl } from './track';
+import { trackLines } from './track';
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
@@ -147,7 +147,7 @@ export const RECEIVED_STAGE = 'Diterima dari unit';
 /**
  * Pesan WA untuk PIC unit: satu dokumen, atau daftar bila beberapa dokumen sekaligus.
  * `codes` berisi kode lacak dokumen-dokumen itu (lihat src/track.ts); bila ada, pesan ditutup
- * dengan satu tautan pantau status. Sama dengan fungsi message di supabase/functions/kabari-pic.
+ * dengan tautan pantau status. Sama dengan fungsi message di supabase/functions/kabari-pic.
  */
 export function signedMessage(docs: Record<string, string>[], stage = '', codes: string[] = []) {
   const v = docs[0] ?? {};
@@ -166,7 +166,7 @@ export function signedMessage(docs: Record<string, string>[], stage = '', codes:
     received
       ? 'Kami akan menginformasikan lagi setelah dokumen ditandatangani.'
       : 'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
-    ...(codes.length ? ['', `Pantau status: ${siteTrackUrl(codes)}`] : []),
+    ...(codes.length ? ['', ...trackLines(codes)] : []),
     '',
     'Terima kasih,',
     'Unit Dokumen Balai Yasa Lahat',

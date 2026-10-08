@@ -5,6 +5,8 @@
 .lk .public-head { max-width: var(--lk-w); }
 .lk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .lk-mono { font-family: var(--lk-mono, ui-monospace, Menlo, Consolas, monospace); letter-spacing: 0.04em; }
+/* Judul yang difokus lewat skrip setelah pindah halaman bukan tombol, jadi tanpa cincin fokus. */
+.lk h1[tabindex='-1']:focus { outline: none; }
 
 .lk-stack { width: 100%; max-width: var(--lk-w); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .lk-card {

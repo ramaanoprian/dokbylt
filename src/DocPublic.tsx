@@ -23,6 +23,33 @@ interface Berkas {
 
 const empty = (): Berkas => ({ jenis: '', perihal: '' });
 
+// Hasil pendaftaran terakhir di tab ini. Membuka halaman lacak lalu kembali tidak menghapus daftar kode
+// lacaknya, dan tidak mengundang unit mendaftarkan dokumen yang sama dua kali.
+const DONE_KEY = 'dokbylt:daftar-dokumen:hasil';
+interface Hasil {
+  form: Record<string, string>;
+  done: Berkas[];
+  ids: string[];
+}
+
+function readHasil(): Hasil | null {
+  try {
+    const h = JSON.parse(sessionStorage.getItem(DONE_KEY) || 'null');
+    return h && Array.isArray(h.done) && Array.isArray(h.ids) && h.form && typeof h.form === 'object' ? h : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeHasil(h: Hasil | null) {
+  try {
+    if (h) sessionStorage.setItem(DONE_KEY, JSON.stringify(h));
+    else sessionStorage.removeItem(DONE_KEY);
+  } catch {
+    /* penyimpanan browser diblokir: hasil hanya tampil sampai halaman ditinggalkan */
+  }
+}
+
 /** Kode lacak satu berkas dengan tombol salin. */
 function CodeChip({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
@@ -46,13 +73,14 @@ function CodeChip({ code }: { code: string }) {
 }
 
 export function DocPublic() {
-  const [f, setF] = useState<Record<string, string>>({});
+  const [saved] = useState(readHasil);
+  const [f, setF] = useState<Record<string, string>>(() => saved?.form ?? {});
   const [items, setItems] = useState<Berkas[]>([empty()]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [done, setDone] = useState<Berkas[] | null>(null);
+  const [done, setDone] = useState<Berkas[] | null>(() => saved?.done ?? null);
   // Id data hasil pendaftaran (urutannya sama dengan berkas), untuk kode lacak.
-  const [ids, setIds] = useState<string[]>([]);
+  const [ids, setIds] = useState<string[]>(() => saved?.ids ?? []);
 
   useEffect(() => {
     const dark = readPref('theme', '');
@@ -71,8 +99,11 @@ export function DocPublic() {
     const r = await callFunction('daftar-dokumen', { action: 'daftar', form: f, berkas: items, website: f.website });
     setSending(false);
     if (r.ok) {
-      setIds(Array.isArray(r.data.ids) ? r.data.ids.map(String) : []);
+      const got = Array.isArray(r.data.ids) ? r.data.ids.map(String) : [];
+      setIds(got);
       setDone(items);
+      const { website: _, ...form } = f;
+      writeHasil({ form, done: items, ids: got });
     } else setError(r.error);
   };
 
@@ -139,6 +170,7 @@ export function DocPublic() {
               setDone(null);
               setIds([]);
               setItems([empty()]);
+              writeHasil(null);
             }}
           >
             Daftarkan dokumen lain

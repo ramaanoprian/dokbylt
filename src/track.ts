@@ -22,6 +22,16 @@ export const isTrackCode = (s: string) => /^[0-9A-F]{10}$/.test(s);
 export const MAX_CODES = 20;
 
 /**
+ * Baris "Pantau status" untuk pesan WA. Kode dipecah per MAX_CODES agar setiap tautan bisa dibuka;
+ * bila lebih dari satu tautan, barisnya diberi nomor. Sama dengan fungsi trackLines di kabari-pic.
+ */
+export function trackLines(codes: string[]) {
+  const urls: string[] = [];
+  for (let i = 0; i < codes.length; i += MAX_CODES) urls.push(siteTrackUrl(codes.slice(i, i + MAX_CODES)));
+  return urls.map((u, i) => (urls.length > 1 ? `Pantau status (${i + 1}/${urls.length}): ${u}` : `Pantau status: ${u}`));
+}
+
+/**
  * Kode-kode lacak dari teks bebas: satu kode, beberapa kode dipisah koma, atau tautan lacak lengkap.
  * Spasi dan strip di dalam kode diabaikan, huruf O dianggap angka nol.
  */

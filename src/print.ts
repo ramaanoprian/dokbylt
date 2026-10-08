@@ -1,6 +1,6 @@
 // Dokumen cetak: tanda terima untuk semua menu, lembar disposisi untuk surat masuk.
 import QRCode from 'qrcode';
-import { OTHER, SIFAT_SURAT, UNITS, type ModuleDef } from './modules';
+import { OTHER, SIFAT_SURAT, SURAT_STATUSES, UNITS, type ModuleDef } from './modules';
 import type { DocRecord } from './backend';
 import { fmtDate, shown } from './util';
 import { siteTrackUrl, trackCode } from './track';
@@ -138,6 +138,9 @@ export function printDisposition(mod: ModuleDef, r: DocRecord) {
   const checks = targets.map((t) => `<div>${box(t === kepada, t)}</div>`).join('');
   const other = kepada && !targets.includes(kepada) ? `<div>${box(true, kepada)}</div>` : '<div><span class="box"></span>…………………</div>';
   const sifat = SIFAT_SURAT.map((s) => `<span class="opt">${box(s === v.sifat, s)}</span>`).join('');
+  // Tanggal disposisi yang belum diisi: pakai tanggal surat masuk ke tahap disposisi (data baru belum punya riwayat).
+  const dicatat = [...(r.history ?? [])].reverse().find((h) => h.status === SURAT_STATUSES[1])?.at;
+  const tanggal = filled ? v.tanggalDisposisi || dicatat : '';
   const isi = filled && v.isiDisposisi?.trim()
     ? `<div class="isi">${esc(v.isiDisposisi.trim())}</div>`
     : '<div class="lines"><div></div><div></div><div></div><div></div><div></div><div></div></div>';
@@ -149,7 +152,7 @@ export function printDisposition(mod: ModuleDef, r: DocRecord) {
   <tr><td><b>Nomor surat</b><br>${esc(v.nomorSurat || '–')}${v.tanggalSurat ? `<br><b>Tanggal surat</b><br>${esc(fmtDate(v.tanggalSurat))}` : ''}</td><td><b>Sifat</b><br>${sifat}</td></tr>
   <tr><td colspan="2"><b>Perihal</b><br>${esc(v.perihal || '')}${tujuan ? `<br><b>Tujuan (sesuai map)</b><br>${esc(tujuan)}` : ''}</td></tr>
   <tr><td><b>Diteruskan kepada</b>${checks}${other}</td><td><b>Isi disposisi</b>${isi}</td></tr>
-  <tr><td><b>Tanggal penyelesaian</b><br>${esc(v.tenggat ? fmtDate(v.tenggat) : '')}</td><td><b>Tanggal disposisi</b><br>${esc(filled && v.tanggalDisposisi ? fmtDate(v.tanggalDisposisi) : '')}<br><br><b>Paraf</b><br><br><br></td></tr>
+  <tr><td><b>Tanggal penyelesaian</b><br>${esc(v.tenggat ? fmtDate(v.tenggat) : '')}</td><td><b>Tanggal disposisi</b><br>${esc(tanggal ? fmtDate(tanggal) : '')}<br><br><b>Paraf</b><br><br><br></td></tr>
 </table>
 <p class="foot">Dokumen ini dibuat dari Dashboard Dokumen BYLT.</p>`;
   open(page(`Disposisi – ${v.perihal || 'surat masuk'}`, body));

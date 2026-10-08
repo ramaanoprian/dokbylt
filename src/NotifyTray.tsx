@@ -4,6 +4,7 @@ import { NOTIFY_WAIT_MS, cancelNotify, flush, onNotifyResult, useNotifyQueue } f
 import { useToast } from './toast';
 import { moduleById } from './modules';
 import { RECEIVED_STAGE, notifyUrl } from './util';
+import { trackCode } from './track';
 
 /** Keterangan singkat tahap di antrean, mis. "3 kiriman siap di-pick up". */
 const STAGE_WORD: Record<string, string> = {
@@ -41,6 +42,7 @@ export function NotifyTray() {
                 notifyUrl(
                   b.docs.map((d) => d.values),
                   b.stage,
+                  b.docs.map((d) => trackCode(d)),
                 ),
                 '_blank',
               ),

@@ -334,3 +334,16 @@ export const CONTACT_NAME: Record<string, string> = { kontakPic: 'pic', kontakKu
 export const firstStatus = (mod: ModuleDef) => mod.statuses.find((s) => s !== mod.preStatus) ?? mod.statuses[0];
 
 export const moduleById = (id: string) => MODULES.find((m) => m.id === id)!;
+
+/**
+ * Isian wajib tiap tahap sampai tahap `status`. Untuk data tersimpan, tahap sebelum tahapnya sekarang
+ * sudah dilewati: isiannya hanya wajib bila sudah terisi (tidak boleh dikosongkan). Dengan begitu data
+ * lama yang melompati tahap baru, mis. surat yang didistribusikan sebelum ada tahap disposisi EVP, tetap
+ * bisa disunting tanpa mengarang isian yang tidak pernah ada.
+ */
+export function stageNeeds(mod: ModuleDef, status: string, record?: { status: string; values: Record<string, string> }) {
+  const saved = record ? mod.statuses.indexOf(record.status) : -1;
+  return mod.statuses
+    .slice(0, mod.statuses.indexOf(status) + 1)
+    .flatMap((s, i) => (mod.requiredForStatus?.[s] ?? []).filter((k) => i >= saved || !!record?.values[k]?.trim()));
+}

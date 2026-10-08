@@ -60,6 +60,24 @@ interface Back {
 
 export const isTrackRoute = () => /^#lacak(\/|$)/i.test(location.hash);
 
+// Sudah berpindah alamat # sejak halaman dibuka, mis. kirim kode, klik baris, atau tombol kembali.
+let navigated = false;
+addEventListener('hashchange', () => {
+  navigated = true;
+});
+
+/**
+ * Fokus ke judul halaman baru setelah berpindah di dalam halaman, agar pengguna keyboard tidak mulai
+ * lagi dari atas dan pembaca layar membacakan hasilnya. Tidak saat halaman pertama kali dibuka.
+ */
+function useTitleFocus(skip = false) {
+  const ref = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (navigated && !skip) ref.current?.focus({ preventScroll: true });
+  }, [skip]);
+  return ref;
+}
+
 function routeRaw() {
   const m = location.hash.match(/^#lacak\/?(.*)$/i);
   try {
@@ -365,17 +383,22 @@ function CodeForm({ initial = '', autoFocus = false }: { initial?: string; autoF
 
 function SearchCard() {
   const [recent, setRecent] = useState(readRecent);
+  // Di layar sentuh kotak kode tidak difokus otomatis (keyboard tidak langsung muncul); fokus ke judul saja.
+  const [touch] = useState(() => matchMedia('(pointer: coarse)').matches);
+  const title = useTitleFocus(!touch);
   return (
     <main className="lk-card lk-search">
       <span className="lk-mark" aria-hidden>
         <ScanSearch size={28} strokeWidth={1.7} />
       </span>
-      <h1>Lacak dokumen.</h1>
+      <h1 ref={title} tabIndex={-1}>
+        Lacak dokumen.
+      </h1>
       <p className="lk-lead">
         Masukkan kode lacak dari tanda terima atau pesan WhatsApp Unit Dokumen untuk melihat posisi dokumen Anda saat
         ini.
       </p>
-      <CodeForm autoFocus={!matchMedia('(pointer: coarse)').matches} />
+      <CodeForm autoFocus={!touch} />
 
       {recent.length > 0 && (
         <section className="lk-recent" aria-label="Terakhir dilacak">
@@ -509,6 +532,7 @@ function BackBar({ back, code }: { back: Back; code?: string }) {
 function Detail({ item, back, actions }: { item: Item; back: Back; actions: ReactNode }) {
   const def = defOf(item);
   const unitLabel = UNIT_LABEL[item.module];
+  const title = useTitleFocus();
   return (
     <div className="lk-stack">
       <BackBar back={back} code={item.kode} />
@@ -522,7 +546,9 @@ function Detail({ item, back, actions }: { item: Item; back: Back; actions: Reac
             {item.kind && <span className="lk-kind"> · {item.kind}</span>}
           </span>
         </div>
-        <h1 className="lk-title">{item.title}</h1>
+        <h1 className="lk-title" ref={title} tabIndex={-1}>
+          {item.title}
+        </h1>
         <p className="lk-meta">
           {item.unit && unitLabel && (
             <span>
@@ -646,11 +672,14 @@ function History({ item }: { item: Item }) {
 
 function List({ items, missing, actions }: { items: Item[]; missing: string[]; actions: ReactNode }) {
   const done = items.filter((i) => i.done).length;
+  const title = useTitleFocus();
   return (
     <div className="lk-stack">
       <BackBar back={{ href: '#lacak', label: 'Lacak kode lain' }} />
       <section className="lk-card">
-        <h1 className="lk-title lk-list-title">{items.length} dokumen dilacak.</h1>
+        <h1 className="lk-title lk-list-title" ref={title} tabIndex={-1}>
+          {items.length} dokumen dilacak.
+        </h1>
         <p className="lk-meta">
           <span>
             <b>{done}</b> selesai
@@ -760,6 +789,7 @@ function Problem({
   children: ReactNode;
 }) {
   const shown = codes.join(', ');
+  const heading = useTitleFocus();
   const [icon, title, text] =
     load.state === 'invalid'
       ? [
@@ -787,7 +817,9 @@ function Problem({
         <span className="lk-mark" aria-hidden>
           {icon}
         </span>
-        <h1>{title}</h1>
+        <h1 ref={heading} tabIndex={-1}>
+          {title}
+        </h1>
         <p className="lk-lead">{text}</p>
         {load.state === 'error' ? (
           <button type="button" className="pill-btn big" onClick={onRetry} disabled={busy}>

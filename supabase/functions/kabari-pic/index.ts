@@ -47,6 +47,16 @@ function docLine(v: Record<string, string>) {
 /** Kode lacak: 10 karakter heksadesimal pertama dari id, huruf besar. Sama dengan trackCode di src/track.ts. */
 const trackCode = (id: string) => id.replace(/-/g, '').slice(0, 10).toUpperCase();
 
+/** Batas kode dalam satu tautan lacak, sama dengan fungsi lacak-dokumen. */
+const MAX_CODES = 20;
+
+/** Baris "Pantau status", dipecah per MAX_CODES kode. Sama dengan trackLines di src/track.ts. */
+function trackLines(codes: string[]) {
+  const urls: string[] = [];
+  for (let i = 0; i < codes.length; i += MAX_CODES) urls.push(`${SITE}/#lacak/${codes.slice(i, i + MAX_CODES).join(',')}`);
+  return urls.map((u, i) => (urls.length > 1 ? `Pantau status (${i + 1}/${urls.length}): ${u}` : `Pantau status: ${u}`));
+}
+
 // Sama dengan signedMessage di src/util.ts.
 function message(docs: Record<string, string>[], stage: string, codes: string[]) {
   const v = docs[0] ?? {};
@@ -65,7 +75,7 @@ function message(docs: Record<string, string>[], stage: string, codes: string[])
     received
       ? 'Kami akan menginformasikan lagi setelah dokumen ditandatangani.'
       : 'Dokumen bisa diambil di Unit Dokumen, atau akan kami antarkan ke unit.',
-    ...(codes.length ? ['', `Pantau status: ${SITE}/#lacak/${codes.join(',')}`] : []),
+    ...(codes.length ? ['', ...trackLines(codes)] : []),
     '',
     'Terima kasih,',
     'Unit Dokumen Balai Yasa Lahat',
