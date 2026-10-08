@@ -9,11 +9,13 @@ interface Props {
   rows: DocRecord[];
   onOpen: (r: DocRecord) => void;
   onMove: (r: DocRecord, status: string) => void;
+  /** Data yang sedang dibuka di panel rincian, ditandai di papan. */
+  activeId?: string;
 }
 
 const titleOf = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.keperluan || v.tujuan || v.asal || '(tanpa judul)';
 
-export function Board({ mod, rows, onOpen, onMove }: Props) {
+export function Board({ mod, rows, onOpen, onMove, activeId }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const meta = mod.fields.filter((f) => f.inTable && f.type === 'select').slice(0, 2);
@@ -62,7 +64,8 @@ export function Board({ mod, rows, onOpen, onMove }: Props) {
                 return (
                   <article
                     key={r.id}
-                    className={'kcard' + (dragId === r.id ? ' dragging' : '')}
+                    data-rid={r.id}
+                    className={'kcard' + (dragId === r.id ? ' dragging' : '') + (activeId === r.id ? ' ux-active' : '')}
                     draggable
                     onDragStart={(e) => {
                       setDragId(r.id);
