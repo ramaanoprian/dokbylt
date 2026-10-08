@@ -5,8 +5,9 @@ import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backe
 import { daysUntil, defaultDue, notifyUrl, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
 import { Icon } from './icons';
 import { stageClass } from './stats';
-import { Attachments, type FileApi } from './Attachments';
+import { Attachments, uploadAttachment, type FileApi } from './Attachments';
 import { printDisposition, printReceipt } from './print';
+import { PdfAutofill, canAutofill } from './pdfAutofill';
 
 interface Props {
   mod: ModuleDef;
@@ -97,6 +98,34 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
     setValues(next);
   };
 
+  // Isian dari PDF/foto surat: hanya field yang dicentang di langkah tinjau, lalu berpendar sebentar.
+  // Nilai bawaan form baru (mis. tanggal hari ini) dianggap belum diisi pengguna.
+  const [defaults] = useState(() => (record ? {} : values));
+  const [filled, setFilled] = useState<string[]>([]);
+  const applyScan = (patch: Record<string, string>) => {
+    setValues((v) => {
+      const next = { ...v, ...patch };
+      if (mod.dateField in patch && dueAuto && mod.fields.some((f) => f.key === 'tenggat')) {
+        const due = defaultDue(mod, next);
+        if (due) next.tenggat = due;
+      }
+      return next;
+    });
+    setFilled(Object.keys(patch));
+  };
+  useEffect(() => {
+    if (!filled.length) return;
+    const t = setTimeout(() => setFilled([]), 1800);
+    return () => clearTimeout(t);
+  }, [filled]);
+  // Berkas suratnya dilampirkan seperti lewat tombol lampiran.
+  const attachScan = async (file: File) => {
+    const a = await uploadAttachment(file, `${mod.id}/${id}`, userName, files);
+    if (!a || typeof a === 'string') return a ?? 'Gagal dilampirkan';
+    setValues((v) => ({ ...v, lampiran: JSON.stringify([...attachmentsOf(v), a]) }));
+    return null;
+  };
+
   useEffect(() => {
     const on = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     addEventListener('keydown', on);
@@ -170,6 +199,9 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
         </header>
 
         <div className="sheet-body">
+          {canAutofill(mod) && (
+            <PdfAutofill mod={mod} values={values} defaults={defaults} onApply={applyScan} attach={attachScan} />
+          )}
           <fieldset className="stepper">
             <legend>Tahap</legend>
             {mod.statuses.map((s, i) => {
@@ -198,7 +230,10 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
 
           <div className="form-grid">
             {mod.fields.map((f) => (
-              <label key={f.key} className={f.type === 'textarea' ? 'full' : ''}>
+              <label
+                key={f.key}
+                className={(f.type === 'textarea' ? 'full' : '') + (filled.includes(f.key) ? ' autofilled' : '')}
+              >
                 <span>
                   {f.label}
                   {needed.has(f.key) && <em className="req">*</em>}

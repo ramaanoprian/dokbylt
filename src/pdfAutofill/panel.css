@@ -1,0 +1,109 @@
+/* Gaya proses baca, galat, dan langkah tinjau. Dimuat bersama Panel, bukan di bundel utama.
+   Dasar kartu (.paf, .paf-icon, .paf-bar, dan seterusnya) ada di pdfAutofill.css. */
+
+.paf-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.paf-pct { font-size: 0.8rem; font-variant-numeric: tabular-nums; color: var(--muted); flex: none; }
+.paf-note { margin-top: 8px; font-size: 0.75rem; color: var(--muted); animation: paf-in 0.22s var(--paf-ease) both; }
+.paf-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-top: 6px; font-size: 0.8rem; min-width: 0; }
+.paf-meta .paf-file { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+.paf .paf-cancel { flex: none; background: var(--surface); box-shadow: inset 0 0 0 1px var(--paf-line); }
+
+/* Status lampiran */
+.paf-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 7px; border-radius: 980px; background: var(--fill-2); color: var(--muted); font-size: 0.75rem; font-weight: 500; white-space: nowrap; }
+.paf-chip.paf-ok { background: var(--ok-soft); color: var(--ok); }
+.paf-chip.paf-fail { background: var(--danger-soft); color: var(--danger); white-space: normal; }
+.paf-chip .link { font-size: inherit; margin-left: 4px; }
+
+.paf-error { align-items: flex-start; background: color-mix(in srgb, var(--warn) 6%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 22%, var(--hair)); }
+
+/* ---------- Langkah tinjau ---------- */
+.paf-review {
+  display: block; padding: 0; background: var(--surface); overflow: hidden; border: 1px solid var(--paf-line);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 30px -16px color-mix(in srgb, var(--accent, #000) 32%, transparent);
+}
+.paf-head { display: flex; align-items: flex-start; gap: 14px; padding: 16px 12px 14px 16px; background: var(--paf-tint); border-bottom: 1px solid var(--paf-line); }
+.paf-head .icon-btn { margin: -4px 0 0; color: var(--muted); }
+
+.paf-rows { list-style: none; margin: 0; padding: 0; }
+.paf-rows li {
+  display: grid; grid-template-columns: 28px minmax(120px, 0.34fr) minmax(0, 1fr); align-items: start; gap: 4px 12px;
+  padding: 8px 16px; transition: background-color 0.18s var(--paf-ease);
+  animation: paf-row 0.28s var(--paf-ease) both; animation-delay: calc(var(--i, 0) * 28ms);
+}
+@keyframes paf-row { from { opacity: 0; transform: translateY(4px); } }
+.paf-rows li + li { border-top: 1px solid var(--hair); }
+.paf-rows li.paf-on { background: color-mix(in srgb, var(--accent, var(--blue)) 4%, transparent); }
+
+.paf-check { position: relative; display: grid; place-items: center; width: 28px; height: 40px; cursor: pointer; }
+.paf-check input { position: absolute; inset: 0; opacity: 0; margin: 0; width: 100%; height: 100%; min-height: 0; cursor: pointer; }
+.paf-check input:disabled { cursor: default; }
+.paf-box {
+  width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; color: transparent;
+  background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--border);
+  transition: background-color 0.16s var(--paf-ease), box-shadow 0.16s var(--paf-ease), transform 0.16s var(--paf-ease);
+}
+.paf-box svg { transform: scale(0.6); opacity: 0; transition: transform 0.18s var(--paf-ease), opacity 0.14s; }
+.paf-check input:checked + .paf-box { background: var(--accent, var(--blue)); box-shadow: none; color: #fff; }
+.paf-check input:checked + .paf-box svg { transform: none; opacity: 1; }
+.paf-check input:active:not(:disabled) + .paf-box { transform: scale(0.9); }
+.paf-check input:focus-visible + .paf-box { box-shadow: 0 0 0 4px var(--ring), inset 0 0 0 1.5px var(--blue); }
+.paf-check input:disabled + .paf-box { opacity: 0.45; }
+
+.paf-label { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding-top: 10px; }
+.paf-label label { font-size: 0.875rem; font-weight: 500; color: var(--text-2); line-height: 1.3; cursor: pointer; }
+.paf-flag { padding: 1px 8px; border-radius: 980px; background: var(--warn-soft); color: var(--warn); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.01em; }
+.paf-now { max-width: 100%; font-size: 0.75rem; color: var(--muted); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+.paf-input input, .paf-input select, .paf-input textarea {
+  min-height: 40px; padding: 8px 12px; font-size: 0.94rem; border-radius: 10px;
+  background-color: var(--fill-2); border-color: transparent;
+}
+.paf-input select { padding-right: 34px; }
+.paf-input textarea { line-height: 1.45; field-sizing: content; max-height: 220px; }
+.paf-input textarea.paf-oneline { resize: none; min-height: 40px; }
+.paf-input input:focus, .paf-input select:focus, .paf-input textarea:focus { background-color: var(--surface); border-color: var(--blue); }
+.paf-rows li.paf-missing .paf-input :is(input, select, textarea):not(:focus) { background-color: transparent; border: 1px dashed var(--border); }
+.paf-rows li.paf-missing .paf-label label { color: var(--muted); }
+
+.paf-raw { margin: 0 16px; border-top: 1px solid var(--hair); }
+.paf-raw summary { display: inline-flex; align-items: center; gap: 6px; padding: 12px 0; list-style: none; cursor: pointer; font-size: 0.8rem; color: var(--link); }
+.paf-raw summary::-webkit-details-marker { display: none; }
+.paf-raw summary svg { transition: transform 0.2s var(--paf-ease); }
+.paf-raw[open] summary svg { transform: rotate(180deg); }
+.paf-raw pre {
+  margin: 0 0 14px; max-height: 260px; overflow: auto; padding: 12px 14px; border-radius: 12px; background: var(--fill-2); color: var(--text-2);
+  font: 0.75rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere;
+  animation: paf-in 0.22s var(--paf-ease) both;
+}
+
+.paf-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--hair); background: var(--surface-2); }
+.paf-foot .pill-btn { min-height: 34px; padding: 6px 18px; font-size: 0.875rem; }
+
+/* Field form yang baru terisi dari surat berpendar sebentar. */
+.record-form .form-grid label.autofilled :is(input, select, textarea) { animation: paf-glow 1.6s var(--ease, ease) both; }
+@keyframes paf-glow {
+  0%, 30% { background-color: color-mix(in srgb, var(--accent, var(--blue)) 12%, var(--surface)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, var(--blue)) 22%, transparent); }
+}
+
+@media (max-width: 734px) {
+  .paf-error { align-items: flex-start; }
+  .paf .paf-cancel { margin-left: 54px; }
+  .paf-error .paf-copy { flex-basis: calc(100% - 54px); }
+  .paf-error .paf-actions { margin-left: 54px; }
+  .paf-review { padding: 0; }
+  .paf-head { padding: 14px 8px 12px 14px; gap: 12px; }
+  .paf-rows li { grid-template-columns: 28px minmax(0, 1fr); padding: 8px 14px 10px; }
+  .paf-label { padding-top: 0; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 40px; }
+  .paf-label .paf-now { flex-basis: 100%; }
+  .paf-input { grid-column: 1 / -1; }
+  .paf-raw { margin: 0 14px; }
+  .paf-foot { flex-wrap: wrap; padding: 12px 14px; }
+  .paf-foot > .paf-sub { flex-basis: 100%; }
+  .paf-foot .btn, .paf-foot .pill-btn { flex: 1; min-height: 40px; }
+  .paf-foot .spacer { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paf, .paf *, .paf *::before, .paf *::after { animation: none !important; transition: none !important; }
+  .record-form .form-grid label.autofilled :is(input, select, textarea) { animation: none; }
+}
