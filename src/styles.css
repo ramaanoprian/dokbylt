@@ -1099,6 +1099,10 @@ tr:hover td.actions .btn, tr:focus-within td.actions .btn, td.actions .btn:focus
   .sheet-head h2 { font-size: 1.5rem; }
   .sheet-body { padding: 14px 20px 22px; }
   .sheet-foot { padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); }
+  /* Hapus, dua tombol cetak, Batal, dan Simpan harus muat satu baris di HP. */
+  .sheet-foot { gap: 6px; }
+  .sheet-foot .btn { padding-inline: 12px; }
+  .record-form .sheet-foot .pill-btn.big { padding: 8px 18px; }
   td.actions .btn { opacity: 1; }
   .board { grid-auto-flow: column; grid-template-columns: none !important; grid-auto-columns: 84%; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 0 16px 8px; }
   .col { scroll-snap-align: start; }
