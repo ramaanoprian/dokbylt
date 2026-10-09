@@ -2,7 +2,8 @@
 // 1. Animasi keluar: dialog, menu, dan lembar yang dilepas React ditahan sebentar sebagai "bayangan"
 //    yang tidak bisa disentuh (inert), memudar, lalu dibuang.
 // 2. Masuk halaman: elemen .page yang baru dipasang diberi data-entering sebentar, agar baris tabel
-//    dan kartu hanya bergerak masuk pada tampilan pertama, bukan setiap kali disaring.
+//    dan kartu hanya bergerak masuk pada tampilan pertama, bukan setiap kali disaring. Halaman yang
+//    dibuka lewat menu diberi data-quick: cukup silang-pudar singkat, tanpa gerak masuk bergiliran.
 // 3. View Transitions untuk ganti tema dan pindah halaman, dengan cadangan tanpa animasi.
 import { flushSync } from 'react-dom';
 
@@ -76,6 +77,10 @@ function unwatchGone() {
 }
 
 function markEntering(el: HTMLElement) {
+  if (document.documentElement.dataset.vt === 'nav') {
+    el.setAttribute('data-quick', '');
+    return;
+  }
   el.setAttribute('data-entering', '');
   setTimeout(() => el.removeAttribute('data-entering'), ENTER_MS);
 }
@@ -87,7 +92,8 @@ export function startMotion() {
   if (started || typeof MutationObserver === 'undefined') return;
   started = true;
   new MutationObserver((records) => {
-    const calm = reduced();
+    // Selama View Transition tidak ada bayangan keluar: bayangan ikut terekam dan menumpuk di atas tampilan baru.
+    const calm = reduced() || !!document.documentElement.dataset.vt;
     if (watched.size && records.some((r) => r.removedNodes.length)) unwatchGone();
     for (const rec of records) {
       if (!calm && rec.target.isConnected) {
@@ -122,6 +128,8 @@ export function withTransition(kind: 'theme' | 'nav', update: () => void) {
   }
   const root = document.documentElement;
   root.dataset.vt = kind;
+  // Menu atau dialog yang masih memudar keluar dibuang sekarang agar tidak terekam setengah jadi.
+  document.querySelectorAll('.is-leaving').forEach((n) => n.remove());
   try {
     const vt = d.startViewTransition(() => flushSync(update));
     vt.finished.finally(() => {

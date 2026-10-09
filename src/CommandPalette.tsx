@@ -79,7 +79,8 @@ export function CommandPalette({ data, dark, onClose, go, toggleTheme }: Props) 
           <Search size={18} />
           <input
             autoFocus
-            placeholder="Cari dokumen, surat, resi, kegiatan… atau ketik perintah"
+            placeholder="Cari data atau perintah…"
+            aria-label="Cari dokumen, surat, resi, kegiatan, atau perintah"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {

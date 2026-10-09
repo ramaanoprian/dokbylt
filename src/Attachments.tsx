@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, FileText, Paperclip, Trash2 } from 'lucide-react';
 import type { Attachment } from './backend';
+import { markOwnTab } from './ownTab';
 
 export interface FileApi {
   upload: (path: string, file: Blob) => Promise<string | null>;
@@ -73,7 +74,7 @@ function Thumb({ a, files }: { a: Attachment; files: FileApi }) {
   }, [a.path, files]);
   const isImg = a.type.startsWith('image/');
   return (
-    <a className="att-thumb" href={src ?? undefined} target="_blank" rel="noreferrer" aria-label={`Buka ${a.name}`}>
+    <a className="att-thumb" href={src ?? undefined} target="_blank" rel="noreferrer" onClick={markOwnTab} aria-label={`Buka ${a.name}`}>
       {isImg && src ? <img src={src} alt="" loading="lazy" /> : <FileText size={26} />}
     </a>
   );

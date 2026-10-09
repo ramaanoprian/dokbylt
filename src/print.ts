@@ -4,6 +4,7 @@ import { OTHER, SIFAT_SURAT, SURAT_STATUSES, UNITS, type ModuleDef } from './mod
 import type { DocRecord } from './backend';
 import { fmtDate, shown } from './util';
 import { siteTrackUrl, trackCode } from './track';
+import { openOwnTab } from './ownTab';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -36,6 +37,7 @@ const STYLE = `
   .isi { white-space: pre-line; min-height: 120px; margin-top: 4px; }
   .opt { display: inline-block; white-space: nowrap; margin-right: 14px; }
   @media screen { body { background: #eee; padding: 24px; } .doc { background: #fff; padding: 18mm 16mm; box-shadow: 0 2px 12px rgba(0,0,0,.15); } }
+  @media screen and (max-width: 640px) { body { padding: 0; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; } .doc { padding: 16px; box-shadow: none; } }
 `;
 
 function page(title: string, body: string) {
@@ -47,7 +49,7 @@ ${body}
 }
 
 function open(html: string) {
-  const w = window.open('', '_blank');
+  const w = openOwnTab();
   if (!w) {
     alert('Jendela cetak diblokir browser. Izinkan pop-up untuk situs ini lalu coba lagi.');
     return;

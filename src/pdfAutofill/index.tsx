@@ -1,12 +1,31 @@
 // Tombol "Isi dari PDF / foto surat" di form Surat Masuk dan Surat Keluar. Bagian ini sengaja kecil:
 // pembaca PDF, OCR, dan langkah tinjau baru dimuat saat berkas dipilih.
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { Camera, Check, FileUp, Paperclip, ScanText, TriangleAlert } from 'lucide-react';
+import { Component, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Camera, Check, FileUp, Paperclip, RefreshCw, ScanText, TriangleAlert } from 'lucide-react';
 import type { Attachment } from '../backend';
 import type { ModuleDef } from '../modules';
+import { quoteList } from '../util';
 import './pdfAutofill.css';
 
-const Panel = lazy(() => import('./Panel'));
+const load = () => lazy(() => import('./Panel'));
+let Panel = load();
+
+/** Menangkap kegagalan memuat atau menampilkan Panel agar form (dan aplikasi) tidak ikut kosong. */
+class Guard extends Component<{ onError: () => void; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    this.props.onError();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 /** Unggahan berkas surat: data lampirannya, atau pesan galat. */
 export type ScanUpload = Promise<Attachment | string>;
@@ -44,6 +63,8 @@ export function PdfAutofill(props: AutofillProps) {
   const [done, setDone] = useState<Done | null>(null);
   const [drag, setDrag] = useState(false);
   const [wrong, setWrong] = useState('');
+  // Bagian pembaca gagal dimuat (koneksi putus atau situs baru diperbarui): tawarkan muat ulang.
+  const [broken, setBroken] = useState(false);
   const pickRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
   const mainBtn = useRef<HTMLButtonElement>(null);
@@ -66,21 +87,52 @@ export function PdfAutofill(props: AutofillProps) {
 
   if (file) {
     return (
-      <Suspense fallback={<Loading name={file.name} />}>
-        <Panel
-          {...props}
-          file={file}
-          onClose={(count, info) => {
-            back.current = true;
-            setFile(null);
-            if (!info) return;
-            const next: Done = { name: file.name, count, check: info.check, att: 'busy' };
-            setDone(next);
-            // Lampiran bisa selesai setelah langkah tinjau ditutup.
-            info.attached.then((e) => setDone((d) => (d === next ? { ...d, att: e === null ? 'ok' : 'fail' } : d)));
-          }}
-        />
-      </Suspense>
+      <Guard
+        onError={() => {
+          // Lazy menyimpan hasil gagal: buat ulang agar percobaan berikutnya mengunduh lagi.
+          Panel = load();
+          setFile(null);
+          setBroken(true);
+        }}
+      >
+        <Suspense fallback={<Loading name={file.name} />}>
+          <Panel
+            {...props}
+            file={file}
+            onClose={(count, info) => {
+              back.current = true;
+              setFile(null);
+              if (!info) return;
+              const next: Done = { name: file.name, count, check: info.check, att: 'busy' };
+              setDone(next);
+              // Lampiran bisa selesai setelah langkah tinjau ditutup.
+              info.attached.then((e) => setDone((d) => (d === next ? { ...d, att: e === null ? 'ok' : 'fail' } : d)));
+            }}
+          />
+        </Suspense>
+      </Guard>
+    );
+  }
+
+  if (broken) {
+    return (
+      <div className="paf paf-entry paf-wrong" role="alert">
+        <span className="paf-icon paf-warn" aria-hidden="true">
+          <TriangleAlert size={18} />
+        </span>
+        <div className="paf-copy">
+          <b>Fitur ini belum termuat. Muat ulang halaman.</b>
+          <span className="paf-sub">
+            Biasanya karena koneksi terputus atau aplikasi baru diperbarui. Isian yang sudah diketik tetap ada; simpan dulu
+            bila tidak ingin mengetik ulang.
+          </span>
+        </div>
+        <div className="paf-actions">
+          <button ref={mainBtn} type="button" className="btn small" onClick={() => location.reload()}>
+            <RefreshCw size={14} /> Muat ulang halaman
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -125,7 +177,7 @@ export function PdfAutofill(props: AutofillProps) {
             <span className="paf-sub">
               {ATT[done.att]}
               {!done.count ? null : done.check.length ? (
-                <span className="paf-recheck">Cek ulang {new Intl.ListFormat('id').format(done.check).toLowerCase()}.</span>
+                <span className="paf-recheck">Cek ulang {quoteList(done.check)}.</span>
               ) : (
                 'Periksa lagi sebelum menyimpan.'
               )}

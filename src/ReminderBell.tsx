@@ -76,11 +76,11 @@ export function ReminderBell({
           >
             <div className="bell-head">
               <b>Pengingat tenggat</b>
-              <span className="muted small">3 hari ke depan</span>
+              <span className="muted small">Lewat tenggat &amp; 3 hari ke depan</span>
             </div>
             {items.length === 0 ? (
               <p className="muted small bell-empty">
-                Tidak ada tenggat dalam 3 hari ke depan.
+                Tidak ada yang lewat tenggat atau jatuh tempo dalam 3 hari ke depan.
               </p>
             ) : (
               <ul>

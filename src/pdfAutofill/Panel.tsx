@@ -89,14 +89,43 @@ export default function Panel({ file, mod, values, defaults, onApply, upload, ke
   // Batal: form tidak berubah dan unggahannya dibuang.
   const cancel = () => {
     if (job.current) discard(job.current.p);
+    job.current = null;
     onClose(0);
   };
   // Terapkan, atau lampirkan saja bila surat tak terbaca: berkasnya masuk lampiran setelah unggahan selesai.
+  // Unggahan yang sudah diserahkan ke keep() tidak pernah dibuang lagi.
   const finish = (patch: Record<string, string>, check: string[]) => {
     const n = Object.keys(patch).length;
     if (n) onApply(patch);
-    onClose(n, { check, attached: job.current ? keep(job.current.p) : Promise.resolve('Berkas belum terunggah.') });
+    const p = job.current?.p;
+    job.current = null;
+    onClose(n, { check, attached: p ? keep(p) : Promise.resolve('Berkas belum terunggah.') });
   };
+  // Form ditutup (Esc, latar, Batal, Simpan) sebelum Terapkan: unggahannya dibuang agar tidak tertinggal di penyimpanan.
+  // Ditunda satu giliran karena StrictMode melepas lalu memasang ulang efek.
+  const gone = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    clearTimeout(gone.current);
+    return () => {
+      gone.current = setTimeout(() => {
+        if (job.current) discard(job.current.p);
+        job.current = null;
+      });
+    };
+  }, []);
+  // Esc menutup langkah ini saja, bukan seluruh form. Ditangkap lebih dulu (capture) dari pendengar Esc form.
+  const cancelRef = useRef(cancel);
+  cancelRef.current = cancel;
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.isComposing || e.defaultPrevented) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cancelRef.current();
+    };
+    addEventListener('keydown', esc, true);
+    return () => removeEventListener('keydown', esc, true);
+  }, []);
 
   // Fokus pindah ke kartu yang baru tampil bila fokus sebelumnya hilang bersama kartu lama,
   // bukan saat pengguna sedang mengisi field lain sambil menunggu.

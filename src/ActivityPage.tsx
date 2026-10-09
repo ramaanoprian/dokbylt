@@ -4,7 +4,7 @@ import { MODULES, moduleById } from './modules';
 import type { Activity } from './backend';
 import { Icon } from './icons';
 import { Hero, LocalNav } from './LocalNav';
-import { fmtDate, fmtTime } from './util';
+import { fmtDate, fmtTime, quoteList } from './util';
 
 type Range = '7' | '30' | 'bulan';
 const RANGES: [Range, string][] = [
@@ -19,6 +19,10 @@ function rangeStart(r: Range) {
   else d.setDate(d.getDate() - (Number(r) - 1));
   return d.getTime();
 }
+
+/** Jumlah aktivitas yang ditampilkan dulu; sisanya lewat tombol "Tampilkan 50 lagi". */
+const PAGE = 50;
+const nf = (n: number) => n.toLocaleString('id-ID');
 
 const VERB: Record<string, string> = {
   tambah: 'mencatat',
@@ -42,8 +46,8 @@ function describeDetail(a: Activity) {
     const mod = moduleById(a.module);
     const labels = a.detail
       .split(',')
-      .map((k) => mod?.fields.find((f) => f.key === k.trim())?.label.toLowerCase() ?? k.trim());
-    return 'Isian: ' + labels.join(', ');
+      .map((k) => mod?.fields.find((f) => f.key === k.trim())?.label ?? k.trim());
+    return 'Isian ' + quoteList(labels);
   }
   if (a.action === 'hapus') return `Tahap terakhir: ${a.detail}`;
   return a.detail;
@@ -115,21 +119,29 @@ export function ActivityPage({
     };
   }, [activity, range]);
 
-  const groups = useMemo(() => {
+  const matches = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const list = activity.filter(
+    return activity.filter(
       (a) =>
         (!who || a.userName === who) &&
         (!mod || a.module === mod) &&
         (!needle || `${a.label} ${a.detail} ${a.userName}`.toLowerCase().includes(needle)),
     );
+  }, [activity, who, mod, q]);
+  // Daftar panjang: 50 dulu. Kembali ke 50 saat pencarian atau saringan berubah.
+  const pageKey = `${who}|${mod}|${q}`;
+  const [more, setMore] = useState({ key: pageKey, n: PAGE });
+  if (more.key !== pageKey) setMore({ key: pageKey, n: PAGE });
+  const limit = more.key === pageKey ? more.n : PAGE;
+  const remaining = matches.length - limit;
+  const groups = useMemo(() => {
     const out = new Map<string, Activity[]>();
-    for (const a of list) {
+    for (const a of matches.slice(0, limit)) {
       const day = fmtDate(a.at);
       out.set(day, [...(out.get(day) ?? []), a]);
     }
     return [...out.entries()];
-  }, [activity, who, mod, q]);
+  }, [matches, limit]);
 
   return (
     <>
@@ -259,6 +271,16 @@ export function ActivityPage({
                 </ul>
               </div>
             ))
+          )}
+          {remaining > 0 && (
+            <div className="card-foot ux-foot">
+              <span className="muted" aria-live="polite">
+                Menampilkan {nf(limit)} dari {nf(matches.length)} aktivitas
+              </span>
+              <button type="button" className="btn small ux-more" onClick={() => setMore({ key: pageKey, n: limit + PAGE })}>
+                Tampilkan {nf(Math.min(PAGE, remaining))} lagi
+              </button>
+            </div>
           )}
         </div>
       </section>

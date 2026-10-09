@@ -3,6 +3,7 @@ import { ChevronRight, GripVertical } from 'lucide-react';
 import type { ModuleDef } from './modules';
 import type { DocRecord } from './backend';
 import { REMIND_DAYS, daysSince, daysUntil, deadlineOf, dueLabel, dueTone, fmtDate, lastMove, shown } from './util';
+import { stageClass } from './stats';
 
 interface Props {
   mod: ModuleDef;
@@ -48,7 +49,7 @@ export function Board({ mod, rows, onOpen, onMove, activeId }: Props) {
             }}
           >
             <div className="col-head">
-              <span className={'col-dot ' + (i === last ? 'done' : `s${i}`)} />
+              <span className={'col-dot ' + stageClass(mod, s)} />
               <span className="grow">{s}</span>
               <span className="col-count">{all.length}</span>
             </div>

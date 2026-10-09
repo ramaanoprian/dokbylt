@@ -22,8 +22,9 @@ import { useToast } from './toast';
 import { fmtDays, stageClass } from './stats';
 import { printDisposition, printReceipt } from './print';
 import { trackCode, trackUrl } from './track';
+import { markOwnTab } from './ownTab';
 import { missingFor, nextStatus, titleOf } from './records';
-import { daysSince, daysUntil, deadlineOf, dueLabel, dueTone, fmtDate, isDone, lastMove, shown } from './util';
+import { daysSince, daysUntil, deadlineOf, dueLabel, dueTone, fmtDate, isDone, lastMove, quoteList, shown } from './util';
 
 interface Props {
   mod: ModuleDef;
@@ -49,6 +50,10 @@ const fmtStamp = (iso: string) =>
   new Date(iso).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 /** Nilai yang ditampilkan di rincian: tanggal dibaca, angka dipisah titik, pilihan "Lainnya" diganti keterangannya. */
+/** Nomor surat panjang (mis. 123/KA/BYLT/IX/2026) boleh patah setelah "/", bukan di tengah bagian. */
+const slashBreak = (v: string) =>
+  v.includes('/') ? v.split(/(?<=\/)/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part])) : v;
+
 function valueOf(f: Field, v: Record<string, string>) {
   const s = shown(f, v).trim();
   if (!s) return '';
@@ -253,7 +258,7 @@ export function RecordDetail({ mod, record: r, gone, position, onPrev, onNext, o
               </p>
             )}
             <h2 id="ux-detail-title" className="ux-d-title">
-              {title}
+              {slashBreak(title)}
             </h2>
             <div className="ux-d-meta">
               <span className={'pill ' + stageClass(mod, r.status)}>{r.status}</span>
@@ -298,7 +303,7 @@ export function RecordDetail({ mod, record: r, gone, position, onPrev, onNext, o
                   <b className="ux-next-v">{next}</b>
                   {need.length > 0 && (
                     <span className="ux-next-need">
-                      Lengkapi {need.map((f) => f.label.toLowerCase()).join(', ')} dulu.
+                      Isi {quoteList(need.map((f) => f.label))} dulu.
                     </span>
                   )}
                 </div>
@@ -328,8 +333,10 @@ export function RecordDetail({ mod, record: r, gone, position, onPrev, onNext, o
                             <a href={v} target="_blank" rel="noreferrer" className="ux-d-url">
                               {v.replace(/^https?:\/\//i, '')} <ExternalLink size={13} />
                             </a>
-                          ) : (
+                          ) : f.type === 'textarea' ? (
                             v
+                          ) : (
+                            slashBreak(v)
                           )}
                           {f.key === 'tenggat' && dueDays !== undefined && (
                             <>
@@ -445,7 +452,7 @@ function AttachmentTile({ a, files }: { a: Attachment; files: FileApi }) {
   const isImg = a.type.startsWith('image/');
   return (
     <li>
-      <a className="ux-att" href={src ?? undefined} target="_blank" rel="noreferrer" title={a.name} aria-label={`Buka ${a.name}`}>
+      <a className="ux-att" href={src ?? undefined} target="_blank" rel="noreferrer" onClick={markOwnTab} title={a.name} aria-label={`Buka ${a.name}`}>
         <span className="ux-att-thumb">
           {isImg && src ? <img src={src} alt="" loading="lazy" /> : <FileText size={24} />}
         </span>
@@ -494,7 +501,7 @@ function TrackBox({ r, onCopied }: { r: DocRecord; onCopied: (ok: boolean) => vo
             <button type="button" className={'btn small' + (copied ? ' ux-copied' : '')} onClick={copy}>
               {copied ? <Check size={14} strokeWidth={2.6} /> : <Copy size={14} />} {copied ? 'Disalin' : 'Salin tautan'}
             </button>
-            <a className="btn small ghost" href={url} target="_blank" rel="noreferrer">
+            <a className="btn small ghost" href={url} target="_blank" rel="noreferrer" onClick={markOwnTab}>
               <ExternalLink size={14} /> Buka
             </a>
           </div>

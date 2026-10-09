@@ -4,6 +4,7 @@ import { MODULES, type ModuleDef } from '../modules';
 import type { DocRecord } from '../backend';
 import { fmtDays } from '../stats';
 import { shown } from '../util';
+import { openOwnTab } from '../ownTab';
 import {
   avg,
   dayKey,
@@ -485,7 +486,7 @@ const STYLE = (font: string, footLeft: string) => `
 :root { --ink: #0f172a; --ink-2: #334155; --muted: #64748b; --hair: #e2e8f0; --fill: #f1f5f9; --fill-2: #f8fafc; --band: #0b1f3a; --accent: #1f5fbf; --good: #146c2e; --bad: #b42318; }
 * { box-sizing: border-box; }
 html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-body { margin: 0; font: 8.6pt/1.45 'Inter Laporan', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: var(--ink); letter-spacing: -0.005em; }
+body { margin: 0; font: 8.6pt/1.45 'Inter Laporan', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: var(--ink); letter-spacing: -0.005em; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 .doc { width: 182mm; margin: 0 auto; }
 h1, h2, h3, p, figure { margin: 0; }
 b { font-weight: 600; }
@@ -675,7 +676,7 @@ ${staffSection(rep)}
 
 /** Buka laporan di jendela baru (dicetak otomatis). false bila pop-up diblokir browser. */
 export function openReport(rep: MonthReport, meta: ReportMeta) {
-  const w = window.open('', '_blank');
+  const w = openOwnTab();
   if (!w) return false;
   w.document.open();
   w.document.write(reportHtml(rep, meta));

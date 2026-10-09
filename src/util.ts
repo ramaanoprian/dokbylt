@@ -16,6 +16,9 @@ export function fmtDateTime(v: string) {
   return d.toLocaleString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+/** Daftar label isian seperti tertulis di form, mis. “Diteruskan kepada” dan “Isi disposisi EVP”. */
+export const quoteList = (labels: string[]) => new Intl.ListFormat('id').format(labels.map((l) => `“${l}”`));
+
 export const isDone = (mod: ModuleDef, r: DocRecord) => r.status === mod.statuses[mod.statuses.length - 1];
 
 export const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);

@@ -24,7 +24,13 @@ export function missingFor(mod: ModuleDef, r: DocRecord, target: string) {
   if (t <= mod.statuses.indexOf(r.status)) return [];
   // Sama dengan form: isian tahap yang sudah dilewati data lama tidak ditagih lagi.
   const keys = [...new Set(stageNeeds(mod, target, r))];
+  // Urut seperti di form, agar daftar isian di panel rincian sama dengan di form.
+  const at = (k: string) => {
+    const i = mod.fields.findIndex((f) => f.key === k);
+    return i < 0 ? Infinity : i;
+  };
   return keys
+    .sort((a, b) => at(a) - at(b))
     .filter((k) => !r.values[k]?.trim())
     .map((k) => ({ key: k, label: mod.fields.find((f) => f.key === k)?.label ?? k }));
 }

@@ -25,7 +25,7 @@
   --ring: rgba(0, 113, 227, 0.28);
   --focus: #0071e3;
   --nav: rgba(250, 250, 252, 0.82);
-  --lnav: rgba(251, 251, 253, 0.84);
+  --lnav: rgba(251, 251, 253, 0.985);
   --ok: #007d0a;
   --ok-soft: rgba(0, 128, 9, 0.08);
   --warn: #b64400;
@@ -143,7 +143,7 @@
   --ring: rgba(41, 151, 255, 0.4);
   --focus: #2997ff;
   --nav: rgba(22, 22, 23, 0.82);
-  --lnav: rgba(22, 22, 23, 0.82);
+  --lnav: rgba(22, 22, 23, 0.98);
   --ok: #30d158;
   --ok-soft: rgba(48, 209, 88, 0.14);
   --warn: #ff9f0a;
@@ -370,8 +370,11 @@ main { max-width: var(--max); margin: 0 auto; padding: 0 var(--gutter) 40px; pos
 /* Pindah halaman dan ganti tema lewat View Transitions (bila didukung browser). */
 ::view-transition-group(root) { animation-duration: var(--dur-3); }
 html[data-vt='theme']::view-transition-old(root), html[data-vt='theme']::view-transition-new(root) { animation-duration: var(--dur-3); animation-timing-function: var(--ease-standard); }
-html[data-vt='nav']::view-transition-old(root) { animation: fade-out 160ms var(--ease-in) both; }
-html[data-vt='nav']::view-transition-new(root) { animation: none; }
+/* Pindah halaman: silang-pudar singkat, halaman lama dan baru bersamaan. */
+html[data-vt='nav']::view-transition-old(root) { animation: fade-out 180ms var(--ease-standard) both; }
+html[data-vt='nav']::view-transition-new(root) { animation: fade 180ms var(--ease-standard) both; }
+/* Halaman yang dibuka lewat menu langsung tampil utuh; gerak masuk bergiliran hanya saat aplikasi pertama dibuka. */
+.page[data-quick] > *, .page[data-quick] :is(.kpis, .tiles, .people, .stages) > * { animation: none; }
 
 /* ---------- Judul besar ---------- */
 .hero { padding: var(--sp-12) 0 var(--sp-10); }
@@ -632,6 +635,10 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 .notify-item .grow { min-width: 0; }
 .notify-item .btn { white-space: nowrap; }
 .notify-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; color: #fff; background: linear-gradient(160deg, #34c759, #248a3d); }
+.notify-toggle svg { transition: transform var(--dur-2) var(--ease-standard); }
+.notify-toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
+/* Rincian di bawah kartu ringkas: sedikit menjorok dan lebih ringan. */
+.notify-sum ~ .notify-item { margin-left: 12px; box-shadow: var(--e2); }
 @media (max-width: 1000px) {
   .notify-tray { right: 16px; left: 16px; width: auto; top: 60px; bottom: auto; }
 }
@@ -800,7 +807,7 @@ tr:hover td.actions .btn, tr:focus-within td.actions .btn, td.actions .btn:focus
 :root:not([data-theme='dark']) .col { background: #ececf0; }
 .col.over { outline-color: var(--blue); background: var(--blue-soft); }
 .col-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px 12px; font-size: var(--fs-md); font-weight: 600; }
-.col-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dot-mid); }
+.col-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
 .col-dot.new { background: var(--dot-new); }
 .col-dot.done { background: var(--s-done); }
 .col-dot.pre { background: var(--s-pre); }
@@ -870,6 +877,7 @@ tr:hover td.actions .btn, tr:focus-within td.actions .btn, td.actions .btn:focus
 .stepper label:has(input:focus-visible) .dot { box-shadow: 0 0 0 4px var(--ring); }
 
 /* Isian form bergaya isian Apple: latar abu lembut tanpa garis, putih saat aktif. */
+.record-form:focus { outline: none; }
 .record-form .form-grid input, .record-form .form-grid select, .record-form .form-grid textarea { background-color: var(--fill-2); border-color: transparent; }
 .record-form .form-grid input:focus, .record-form .form-grid select:focus, .record-form .form-grid textarea:focus { background-color: var(--surface); border-color: var(--blue); }
 .record-form .form-grid label > span:first-child { font-size: var(--fs-sm); font-weight: 500; color: var(--muted); letter-spacing: 0; }
@@ -1063,11 +1071,15 @@ tr:hover td.actions .btn, tr:focus-within td.actions .btn, td.actions .btn:focus
   /* Tenggat pindah ke baris sendiri agar judul tidak terpotong. */
   .list li:has(> .due) { flex-wrap: wrap; row-gap: 2px; }
   .list li > .due { order: 3; flex-basis: 100%; padding-left: 44px; font-size: var(--fs-xs); }
+  .bell-pop li { flex-wrap: wrap; row-gap: 2px; }
+  .bell-pop li .due { order: 3; flex-basis: 100%; padding-left: 44px; font-size: var(--fs-xs); }
   .day-head { padding: 10px 20px 6px; }
   .hbars li { grid-template-columns: 110px minmax(0, 1fr) 30px; }
-  .controls { gap: 10px; flex-wrap: nowrap; }
-  .controls select { min-width: 0; flex: 1; }
+  /* Kolom cari satu baris penuh; pilihan di bawahnya berbagi lebar dan turun baris bila sempit. */
+  .controls { gap: 10px; }
+  .controls select { min-width: 140px; flex: 1 1 0; }
   .search { flex: 1 1 auto; min-width: 0; }
+  .controls > .search { flex-basis: 100%; max-width: none; }
   .controls .segmented button { padding: 0 12px; }
   .chips { margin: 0 -16px 16px; padding: 2px 16px; }
   .table-wrap > table:not(.mini) { display: none; }
@@ -1188,3 +1200,8 @@ tr:hover td.actions .btn, tr:focus-within td.actions .btn, td.actions .btn:focus
 .backup-list li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: var(--fs-base); }
 .backup-list li:last-child { border-bottom: 0; }
 .backup-list a.btn { text-decoration: none; }
+
+/* Layar galat tak terduga: tawarkan muat ulang. */
+.crash { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px 20px; text-align: center; }
+.crash h1 { font-size: 1.6rem; letter-spacing: -0.02em; }
+.crash p { margin: 0 0 8px; max-width: 460px; color: var(--muted); }

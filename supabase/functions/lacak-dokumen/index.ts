@@ -82,8 +82,8 @@ function info(kode: string, r: Row) {
   const m = MENU[r.module];
   const v = r.values ?? {};
   const done = r.status === m.statuses[m.statuses.length - 1];
-  // Surat rahasia: perihal dan tujuannya tidak ditampilkan.
-  const secret = r.module === 'surat' && v.sifat === 'Rahasia';
+  // Data bersifat rahasia (menu apa pun, mis. Surat Masuk atau Surat Keluar): perihal, jenis, dan tujuannya tidak ditampilkan.
+  const secret = v.sifat === 'Rahasia';
   const unit = secret || !m.unit ? '' : r.module === 'surat' ? pick(v, 'disposisiKepada') || pick(v, 'tujuan') : pick(v, m.unit);
   return {
     kode,
@@ -91,8 +91,8 @@ function info(kode: string, r: Row) {
     menu: m.menu,
     statuses: m.statuses,
     status: r.status,
-    title: secret ? 'Surat rahasia' : pick(v, m.title) || m.item,
-    kind: r.module === 'evp' ? pick(v, 'jenis') || undefined : undefined,
+    title: secret ? `${m.item} rahasia` : pick(v, m.title) || m.item,
+    kind: !secret && r.module === 'evp' ? pick(v, 'jenis') || undefined : undefined,
     unit: unit || undefined,
     created: r.created_at,
     history: (r.history ?? [])

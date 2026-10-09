@@ -272,10 +272,11 @@
   .lk-timeline time span::before { content: ', '; }
 
   .lk-list { margin: 16px -8px 0; }
-  .lk-row { flex-wrap: wrap; padding: 12px 8px; gap: 10px 12px; }
+  .lk-row { position: relative; flex-wrap: wrap; padding: 12px 32px 12px 8px; gap: 10px 12px; }
   .lk-row-main { flex-basis: calc(100% - 44px); }
   .lk-row .pill { margin-left: 44px; }
-  .lk-row .lk-chev { display: none; }
+  /* Panah tetap tampil di tepi kanan agar baris jelas bisa diketuk. */
+  .lk-row .lk-chev { position: absolute; right: 8px; top: 50%; margin-top: -8px; }
 
   .lk-actions .grow { display: none; }
   .lk-updated { order: 3; width: 100%; padding-left: 4px; }

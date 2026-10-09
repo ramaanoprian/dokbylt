@@ -3,7 +3,7 @@ import { Check, MessageCircle, Printer, X } from 'lucide-react';
 import { OTHER, firstStatus, otherKey, stageNeeds, type ModuleDef } from './modules';
 import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
 import { trackCode } from './track';
-import { daysUntil, defaultDue, notifyUrl, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
+import { daysUntil, defaultDue, notifyUrl, dueLabel, dueTone, emailOf, fmtDateTime, quoteList, resiMessage, today, waNumber } from './util';
 import { Icon } from './icons';
 import { stageClass } from './stats';
 import { Attachments, uploadAttachment, type FileApi } from './Attachments';
@@ -46,6 +46,21 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
   const missing = mod.fields.filter((f) => needed.has(f.key) && !values[f.key]?.trim());
   const otherMissing = mod.fields.filter((f) => values[f.key] === OTHER && !values[otherKey(f.key)]?.trim());
   const blocked = missing.length + otherMissing.length > 0;
+  // Fokus awal hanya dengan mouse/trackpad: di HP keyboard akan menutupi kartu "Isi dari PDF / foto surat".
+  const [fine] = useState(() => matchMedia('(pointer: fine)').matches);
+  // Dibuka untuk pindah tahap tetapi ada isian wajib yang kosong: gulir ke isian pertama itu dan fokuskan.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [firstMissing] = useState(() => (targetStatus ? missing[0]?.key : undefined));
+  useEffect(() => {
+    // Tanpa fokus awal (HP), fokus tetap dipindah ke dalam dialog tanpa memunculkan keyboard.
+    if (!firstMissing) {
+      if (!fine) formRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const el = formRef.current?.querySelector<HTMLElement>(`[data-key="${firstMissing}"] :is(input, select, textarea)`);
+    el?.scrollIntoView({ block: 'center' });
+    el?.focus({ preventScroll: true });
+  }, [firstMissing, fine]);
   // Buku kontak dari data sebelumnya (PIC, kurir, pemohon): nama → nomor WA terakhir yang dipakai.
   const pairs = useMemo(
     () => Object.entries(CONTACT_PAIRS).filter(([n, p]) => mod.fields.some((f) => f.key === n) && mod.fields.some((f) => f.key === p)),
@@ -156,8 +171,9 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
     });
   };
 
+  // Esc yang sudah ditangani bagian lain (mis. langkah tinjau isi dari surat) tidak menutup form.
   useEffect(() => {
-    const on = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const on = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && onClose();
     addEventListener('keydown', on);
     return () => removeEventListener('keydown', on);
   }, [onClose]);
@@ -206,6 +222,8 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <form
+        ref={formRef}
+        tabIndex={-1}
         className="sheet record-form"
         data-mod={mod.id}
         onSubmit={submit}
@@ -255,14 +273,13 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
           </fieldset>
           {otherMissing.length > 0 && (
             <p className="notice">
-              Anda memilih “Lainnya” pada {otherMissing.map((f) => f.label.toLowerCase()).join(', ')}. Sebutkan
-              keterangannya sebelum menyimpan.
+              Anda memilih “Lainnya” pada {quoteList(otherMissing.map((f) => f.label))}. Sebutkan keterangannya sebelum
+              menyimpan.
             </p>
           )}
           {targetStatus && missing.length > 0 && (
             <p className="notice">
-              Lengkapi {missing.map((f) => f.label.toLowerCase()).join(', ')} untuk memindahkan ke tahap “
-              {targetStatus}”.
+              Isi {quoteList(missing.map((f) => f.label))} untuk memindahkan ke tahap “{targetStatus}”.
             </p>
           )}
 
@@ -270,6 +287,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
             {mod.fields.map((f) => (
               <label
                 key={f.key}
+                data-key={f.key}
                 className={(f.type === 'textarea' ? 'full' : '') + (filled.includes(f.key) ? ' autofilled' : '')}
               >
                 <span>
@@ -300,7 +318,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
                   <textarea rows={3} value={values[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)} />
                 ) : (
                   <input
-                    autoFocus={!record && f === mod.fields.find((x) => x.type !== 'date')}
+                    autoFocus={fine && !record && !firstMissing && f === mod.fields.find((x) => x.type !== 'date')}
                     type={f.type}
                     placeholder={f.placeholder}
                     min={f.type === 'number' ? 0 : undefined}

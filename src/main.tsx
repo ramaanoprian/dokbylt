@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { Component, StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { DronePublic, isDroneRoute } from './DronePublic';
@@ -31,10 +31,37 @@ function Root() {
   return <App />;
 }
 
+/** Galat yang tidak tertangkap di mana pun: tampilkan layar muat ulang, bukan halaman kosong. */
+class Crash extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div className="crash" role="alert">
+        <h1>Halaman belum bisa ditampilkan.</h1>
+        <p>
+          Biasanya karena koneksi terputus atau aplikasi baru saja diperbarui. Muat ulang halaman untuk memakai versi terbaru;
+          data yang sudah tersimpan tetap aman.
+        </p>
+        <button type="button" className="pill-btn big" onClick={() => location.reload()} autoFocus>
+          Muat ulang halaman
+        </button>
+      </div>
+    );
+  }
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ToastProvider>
-      <Root />
-    </ToastProvider>
+    <Crash>
+      <ToastProvider>
+        <Root />
+      </ToastProvider>
+    </Crash>
   </StrictMode>,
 );

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, 
 import { ArrowDownRight, ArrowUpRight, Check, CheckCircle2, FileChartColumn, FileDown, Minus, X } from 'lucide-react';
 import { MODULES } from '../modules';
 import type { Activity, DataStore } from '../backend';
-import { CountUp } from '../charts';
 import { fmtDays } from '../stats';
 import { avg, buildReport, defaultMonth, monthLabel, onTimeRate, recentMonths } from './compute';
 import { countDelta, daysDelta, openReport, rateDelta, type Delta } from './template';
@@ -110,12 +109,19 @@ export default function ReportDialog({ data, activity, userName, onClose }: Prop
   const prevName = rep.prevLabel;
   const rate = onTimeRate(total);
   const avgNow = avg(total);
+  // Angka KPI langsung tampil (memudar saat bulan diganti), tidak dihitung naik: baris pembanding di bawahnya
+  // sudah menyebut angka akhir, jadi keduanya harus sama sejak awal.
+  const fixed = (n: number) => (
+    <span key={n} className="rp-fade">
+      {n.toLocaleString('id-ID')}
+    </span>
+  );
   const kpis: { label: string; value: ReactNode; d: Delta }[] = [
-    { label: 'Masuk', value: <CountUp value={total.masuk} />, d: countDelta(total.masuk, prev.masuk, prevName, hasPrev) },
-    { label: 'Selesai', value: <CountUp value={total.selesai} />, d: countDelta(total.selesai, prev.selesai, prevName, hasPrev, true) },
+    { label: 'Masuk', value: fixed(total.masuk), d: countDelta(total.masuk, prev.masuk, prevName, hasPrev) },
+    { label: 'Selesai', value: fixed(total.selesai), d: countDelta(total.selesai, prev.selesai, prevName, hasPrev, true) },
     {
       label: 'Masih berjalan',
-      value: <CountUp value={total.berjalan} />,
+      value: fixed(total.berjalan),
       d: countDelta(total.berjalan, prev.berjalan, prevName, hasPrev, false),
     },
     {
@@ -134,14 +140,14 @@ export default function ReportDialog({ data, activity, userName, onClose }: Prop
           '–'
         ) : (
           <>
-            <CountUp value={Math.round(rate)} />%
+            {fixed(Math.round(rate))}%
           </>
         ),
       d: rateDelta(rate, onTimeRate(prev), prevName),
     },
     {
       label: 'Lewat tenggat',
-      value: <CountUp value={total.overdue} />,
+      value: fixed(total.overdue),
       d: countDelta(total.overdue, prev.overdue, prevName, hasPrev, false),
     },
   ];
