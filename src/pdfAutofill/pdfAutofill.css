@@ -1,0 +1,85 @@
+/* Isi dari PDF / foto surat: kartu di atas form dan bilah kemajuan.
+   Gaya proses baca, galat, dan langkah tinjau ada di panel.css, yang baru dimuat bersama Panel. */
+
+.paf {
+  --paf-ease: var(--ease-standard);
+  --paf-tint: color-mix(in srgb, var(--accent, var(--blue)) 7%, var(--surface));
+  --paf-line: color-mix(in srgb, var(--accent, var(--blue)) 22%, var(--hair));
+  position: relative; display: flex; align-items: center; gap: 14px; margin: 0 0 24px; padding: 14px 14px 14px 16px;
+  border-radius: var(--r-md); background: var(--paf-tint); box-shadow: inset 0 0 0 1px var(--paf-line);
+  animation: paf-in var(--dur-3) var(--ease-emph) both;
+  transition: box-shadow var(--dur-2) var(--paf-ease), background-color var(--dur-2) var(--paf-ease), transform var(--dur-2) var(--paf-ease);
+}
+@keyframes paf-in { from { opacity: 0; transform: translateY(6px); } }
+/* Kartu menerima fokus dari skrip (tabindex -1) agar pembaca layar tidak kehilangan posisi; tanpa cincin fokus. */
+.paf:focus { outline: none; }
+
+.paf-icon {
+  width: 40px; height: 40px; border-radius: 11px; flex: none; display: grid; place-items: center; color: #fff;
+  background: linear-gradient(160deg, var(--accent-2, #8e8e93), var(--accent, #636366));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 4px 10px -2px color-mix(in srgb, var(--accent, #000) 40%, transparent),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.4);
+}
+.paf-icon.paf-ok { background: linear-gradient(160deg, #34c759, var(--s-done)); box-shadow: 0 4px 10px -2px color-mix(in srgb, var(--s-done) 45%, transparent); }
+.paf-icon.paf-warn { background: var(--warn-soft); color: var(--warn); box-shadow: none; }
+.paf-icon.paf-busy { position: relative; overflow: hidden; }
+/* Garis pindai halus yang bergerak di ikon selama membaca. */
+.paf-icon.paf-busy::after {
+  content: ''; position: absolute; left: 6px; right: 6px; height: 2px; border-radius: 1px; top: 8px;
+  background: rgba(255, 255, 255, 0.9); box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+  animation: paf-scan 1.5s var(--paf-ease) infinite alternate;
+}
+@keyframes paf-scan { to { top: 30px; } }
+
+.paf-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.paf-copy b { font-size: 0.94rem; font-weight: 600; letter-spacing: -0.012em; color: var(--text); line-height: 1.3; }
+.paf-sub { font-size: 0.8rem; line-height: 1.4; color: var(--muted); letter-spacing: -0.005em; text-wrap: pretty; }
+.paf-file { color: var(--text-2); font-weight: 500; overflow-wrap: anywhere; }
+.paf-name { display: flex; gap: 4px; min-width: 0; white-space: nowrap; }
+.paf-name .paf-file { overflow: hidden; text-overflow: ellipsis; overflow-wrap: normal; min-width: 0; }
+.paf-recheck { color: var(--warn); font-weight: 500; }
+
+.paf-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+/* Diawali .paf agar tidak kalah oleh .btn/.pill-btn global, apa pun urutan muat CSS-nya. */
+.paf .paf-pick { min-height: 34px; padding: 6px 16px; font-size: 0.875rem; }
+/* Tombol kamera hanya di perangkat sentuh; di desktop cukup "Pilih berkas". */
+.paf .paf-cam { display: none; width: 34px; min-height: 34px; padding: 0; background: var(--surface); box-shadow: inset 0 0 0 1px var(--paf-line); }
+@media (pointer: coarse) { .paf .paf-cam { display: inline-flex; } }
+
+/* Seret berkas ke kartu */
+.paf-entry.paf-drag {
+  background: color-mix(in srgb, var(--accent, var(--blue)) 13%, var(--surface));
+  box-shadow: inset 0 0 0 2px var(--accent, var(--blue)), 0 10px 30px -12px color-mix(in srgb, var(--accent, var(--blue)) 45%, transparent);
+  transform: scale(1.006);
+}
+.paf-entry.paf-drag .paf-actions { opacity: 0.4; }
+.paf-entry.paf-wrong { background: color-mix(in srgb, var(--warn) 6%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 22%, var(--hair)); }
+.paf-entry.paf-done { background: color-mix(in srgb, var(--s-done) 8%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--s-done) 26%, var(--hair)); }
+
+/* Bilah kemajuan */
+.paf-bar { position: relative; display: block; height: 4px; margin-top: 10px; border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--accent, var(--blue)) 14%, var(--fill)); }
+.paf-bar > span {
+  position: absolute; inset: 0 auto 0 0; border-radius: inherit; overflow: hidden;
+  background: linear-gradient(90deg, var(--accent-2, var(--blue)), var(--accent, var(--blue)));
+  transition: width 0.28s var(--paf-ease);
+}
+.paf-bar > span::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  animation: paf-sheen 1.4s ease-in-out infinite;
+}
+@keyframes paf-sheen { to { transform: translateX(100%); } }
+
+@media (max-width: 734px) {
+  .paf { flex-wrap: wrap; gap: 12px; padding: 14px; }
+  .paf-entry .paf-copy { flex-basis: calc(100% - 54px); }
+  .paf-entry .paf-actions { width: 100%; }
+  .paf-entry .paf-actions .pill-btn, .paf-entry .paf-actions .btn:not(.paf-cam) { flex: 1; min-height: 40px; }
+  .paf .paf-cam { width: 40px; min-height: 40px; }
+  .paf-work { align-items: flex-start; }
+  .paf-work .paf-copy { flex-basis: calc(100% - 54px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paf, .paf *, .paf *::before, .paf *::after { animation: none !important; transition: none !important; }
+}

@@ -1,7 +1,7 @@
 // Impor dan ekspor Excel. Pustaka dimuat saat dibutuhkan saja agar aplikasi tetap ringan.
 import { MODULES, OTHER, firstStatus, otherKey, type Field, type ModuleDef } from './modules';
 import { newId, type DataStore, type DocRecord } from './backend';
-import { defaultDue, shown, today } from './util';
+import { defaultDue, quoteList, shown, today } from './util';
 
 type Cell = string | number | boolean | Date | null | undefined;
 
@@ -214,9 +214,9 @@ export async function readImportFile(file: File, mod: ModuleDef, userName: strin
       }
       values[f.key] = text;
     });
-    const lacking = mod.fields.filter((f) => f.required && !values[f.key]).map((f) => f.label.toLowerCase());
+    const lacking = mod.fields.filter((f) => f.required && !values[f.key]).map((f) => f.label);
     if (lacking.length) {
-      skipped.push({ row: line, reason: `${lacking.join(', ')} kosong` });
+      skipped.push({ row: line, reason: `${quoteList(lacking)} kosong` });
       return;
     }
     // Data yang belum selesai tanpa tenggat diberi tenggat bawaan menu.

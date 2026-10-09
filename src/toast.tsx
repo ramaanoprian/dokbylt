@@ -10,7 +10,12 @@ interface Toast {
   id: number;
   text: string;
   actions: ToastAction[];
+  /** Sedang bergeser keluar; dibuang setelah animasinya selesai. */
+  leaving?: boolean;
 }
+
+/** Lama animasi keluar toast (sama dengan --dur-2 di styles.css). */
+const LEAVE_MS = 200;
 
 const Ctx = createContext<(text: string, action?: ToastAction | ToastAction[]) => void>(() => {});
 
@@ -20,13 +25,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const seq = useRef(0);
 
-  const dismiss = useCallback((id: number) => setToasts((t) => t.filter((x) => x.id !== id)), []);
+  const dismiss = useCallback((id: number) => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setToasts((t) => t.filter((x) => x.id !== id));
+      return;
+    }
+    setToasts((t) => t.map((x) => (x.id === id ? { ...x, leaving: true } : x)));
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), LEAVE_MS);
+  }, []);
 
   const show = useCallback(
     (text: string, action?: ToastAction | ToastAction[]) => {
       const id = ++seq.current;
       const actions = action ? (Array.isArray(action) ? action : [action]) : [];
-      setToasts((t) => [...t.slice(-2), { id, text, actions }]);
+      setToasts((t) => [...t.filter((x) => !x.leaving).slice(-2), { id, text, actions }]);
       setTimeout(() => dismiss(id), actions.length > 1 ? 10000 : actions.length ? 6000 : 3500);
     },
     [dismiss],
@@ -37,7 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       <div className="toasts" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className="toast-item">
+          <div key={t.id} className={'toast-item' + (t.leaving ? ' leaving' : '')}>
             <CheckCircle2 size={18} className="toast-ok" />
             <span className="grow">{t.text}</span>
             {t.actions.map((a) => (

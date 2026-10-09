@@ -1,0 +1,289 @@
+/* Halaman lacak publik (#lacak) dan kode lacak di formulir pendaftaran.
+   Kartu putih yang tenang, gerak singkat dan halus, warna tahap sama dengan dashboard. */
+
+/* Kurva, huruf mono, sudut, dan bayangan memakai token di styles.css. */
+.lk { --lk-ease: var(--ease-standard); --lk-w: 720px; --lk-mono: var(--mono); }
+.lk .public-head { max-width: var(--lk-w); }
+.lk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lk-mono { font-family: var(--lk-mono, ui-monospace, Menlo, Consolas, monospace); letter-spacing: 0.04em; }
+/* Judul yang difokus lewat skrip setelah pindah halaman bukan tombol, jadi tanpa cincin fokus. */
+.lk h1[tabindex='-1']:focus { outline: none; }
+
+.lk-stack { width: 100%; max-width: var(--lk-w); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.lk-card {
+  background: var(--surface); border-radius: var(--r-xl); box-shadow: var(--e1); padding: var(--sp-8); min-width: 0;
+  animation: lk-in var(--dur-4) var(--ease-emph) both;
+}
+.lk-stack > :nth-child(2) { animation-delay: 40ms; }
+.lk-stack > :nth-child(3) { animation-delay: 80ms; }
+.lk-stack > :nth-child(n + 4) { animation-delay: 120ms; }
+.lk-bar, .lk-actions, .lk-privacy { animation: lk-fade var(--dur-3) var(--lk-ease) both; }
+@keyframes lk-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes lk-fade { from { opacity: 0; } }
+
+/* Tanda tahap: warna sama dengan dashboard (sudah dicek aman untuk buta warna). */
+.lk .pre { --c: var(--s-pre); }
+.lk .s0 { --c: var(--s0); }
+.lk .s1 { --c: var(--s1); }
+.lk .s2 { --c: var(--s2); }
+.lk .done { --c: var(--s-done); }
+
+/* ---------- Pencarian ---------- */
+.lk-search {
+  width: 100%; max-width: var(--lk-w); margin: clamp(8px, 5vh, 56px) auto 0; padding: 48px 40px 36px;
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px;
+}
+.lk-search .lk-form, .lk-search .lk-recent { max-width: 500px; }
+.lk-mark {
+  width: 60px; height: 60px; border-radius: 18px; display: grid; place-items: center; color: #fff; margin-bottom: 8px;
+  background: linear-gradient(160deg, var(--accent-2), var(--accent));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 10px 24px -8px color-mix(in srgb, var(--accent) 60%, transparent), inset 0 0.5px 0 rgba(255, 255, 255, 0.4);
+}
+.lk-search h1 { font-size: 2.25rem; line-height: 1.1; letter-spacing: -0.025em; }
+.lk-lead { color: var(--muted); font-size: 1.06rem; line-height: 1.45; max-width: 42ch; text-wrap: pretty; }
+.lk-form { width: 100%; display: flex; gap: 10px; margin-top: 18px; }
+.lk-field { position: relative; flex: 1; min-width: 0; display: block; }
+.lk-input {
+  height: 52px; border-radius: 14px; padding: 0 58px 0 18px; background: var(--fill-2); border-color: transparent;
+  font: 600 1.2rem/1 var(--lk-mono); letter-spacing: 0.12em; text-transform: uppercase;
+  transition: background var(--dur-2) var(--lk-ease), border-color var(--dur-2) var(--lk-ease), box-shadow var(--dur-2) var(--lk-ease);
+}
+.lk-input::placeholder {
+  font-family: var(--font); font-size: 1rem; font-weight: 400;
+  letter-spacing: -0.01em; text-transform: none;
+}
+.lk-input:focus { background: var(--surface); }
+.lk-input[aria-invalid='true'] { border-color: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft); }
+.lk-count {
+  position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: none;
+  font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; transition: color var(--dur-2) var(--lk-ease);
+}
+.lk-count.full { color: var(--ok); display: grid; }
+.lk-go { min-height: 52px !important; padding: 0 24px !important; flex: none; gap: 8px !important; }
+.lk-go svg { transition: transform var(--dur-2) var(--lk-ease); }
+.lk-go:hover:not(:disabled) svg { transform: translateX(2px); }
+.lk-help { font-size: 0.84rem; color: var(--muted); min-height: 1.3em; margin-top: 2px; transition: color var(--dur-2) var(--lk-ease); }
+.lk-help.error { color: var(--danger); }
+
+.lk-recent { width: 100%; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--hair); text-align: left; }
+.lk-recent-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.lk-recent-head .link { font-size: 0.8rem; font-weight: 400; }
+.lk-recent ul { list-style: none; margin: 0 -10px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.lk-recent-row {
+  display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 12px; color: var(--text); text-decoration: none;
+  transition: background var(--dur-2) var(--lk-ease);
+}
+.lk-recent-row:hover { background: var(--fill-2); }
+.lk-recent-row b { font-weight: 500; font-size: 0.94rem; }
+.lk-recent-row svg { color: var(--muted); }
+.lk-recent-meta { font-size: 0.8rem; color: var(--muted); }
+
+.lk-points { list-style: none; margin: 22px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; font-size: 0.8rem; color: var(--muted); }
+.lk-points li { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---------- Bilah atas hasil ---------- */
+.lk-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
+.lk-back {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 8px; margin-left: -8px; border-radius: var(--r-pill);
+  color: var(--link); text-decoration: none; font-size: 0.94rem; transition: background var(--dur-2) var(--lk-ease);
+}
+.lk-back:hover { background: var(--blue-soft); }
+.lk-back svg { transition: transform var(--dur-2) var(--lk-ease); }
+.lk-back:hover svg { transform: translateX(-2px); }
+.lk-code {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 12px 4px 14px; border: 0; cursor: pointer;
+  border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--e1); color: var(--muted); font-size: var(--fs-xs);
+  transition: box-shadow var(--dur-2) var(--lk-ease), transform var(--dur-2) var(--lk-ease);
+}
+.lk-code:hover { box-shadow: var(--e2); }
+.lk-code:active { transform: scale(0.98); }
+.lk-code b { font: 600 0.9rem/1 var(--lk-mono, ui-monospace, Menlo, Consolas, monospace); letter-spacing: 0.08em; color: var(--text); }
+.lk-code svg { color: var(--muted); }
+.lk-code svg.ok { color: var(--ok); }
+
+/* ---------- Rincian satu dokumen ---------- */
+.lk-eyebrow { display: flex; align-items: center; gap: 10px; font-size: 0.875rem; font-weight: 600; color: var(--accent); }
+.lk-eyebrow .app-icon.sm { width: 28px; height: 28px; border-radius: 8px; }
+.lk-kind { color: var(--muted); font-weight: 500; }
+.lk-title { font-size: 2rem; line-height: 1.15; letter-spacing: -0.022em; margin: 14px 0 10px; text-wrap: balance; overflow-wrap: anywhere; }
+.lk-meta { display: flex; flex-wrap: wrap; gap: 4px 18px; color: var(--muted); font-size: 0.94rem; }
+.lk-meta b { color: var(--text-2); font-weight: 500; }
+
+.lk-status {
+  --c: var(--s2); margin-top: 24px; padding: 20px 22px; border-radius: 18px; display: flex; gap: 16px; align-items: flex-start;
+  background: color-mix(in srgb, var(--c) 8%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 24%, transparent);
+  animation: lk-in var(--dur-4) var(--ease-emph) 0.06s both;
+}
+.lk-status-icon { position: relative; width: 42px; height: 42px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; background: var(--c); }
+/* Denyut pelan: dokumen sedang diproses. */
+.lk-status-icon.live::after {
+  content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--c); opacity: 0;
+  animation: lk-pulse 2.6s var(--lk-ease) 0.4s infinite;
+}
+@keyframes lk-pulse { 0% { transform: scale(0.9); opacity: 0.55; } 70%, 100% { transform: scale(1.3); opacity: 0; } }
+.lk-status-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: color-mix(in srgb, var(--c) 70%, var(--text)); }
+.lk-status h2 { font-size: 1.4rem; line-height: 1.2; letter-spacing: -0.02em; margin: 3px 0 6px; }
+.lk-status p { color: var(--text-2); font-size: 0.97rem; line-height: 1.45; text-wrap: pretty; }
+.lk-facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.lk-fact {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: var(--r-pill); font-size: 0.8rem; line-height: 1.3;
+  background: var(--surface); color: var(--text-2); box-shadow: 0 0 0 1px var(--hair);
+}
+.lk-fact svg { color: var(--muted); }
+.lk-fact.soon, .lk-fact.soon svg { color: var(--warn); }
+.lk-fact.over { color: var(--warn); background: var(--warn-soft); box-shadow: none; font-weight: 500; }
+.lk-fact.over svg { color: var(--warn); }
+
+/* Langkah tahap: mendatar di layar lebar, menurun di HP. */
+.lk-steps { --n: 3; --p: 0; position: relative; list-style: none; margin: 30px 0 2px; padding: 0; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+.lk-steps::before, .lk-steps::after {
+  content: ''; position: absolute; top: 15px; height: 3px; border-radius: 2px;
+  left: calc(50% / var(--n)); right: calc(50% / var(--n)); background: var(--fill);
+}
+.lk-steps::after { background: var(--s-done); transform-origin: left center; transform: scaleX(var(--p)); animation: lk-fill var(--dur-4) var(--ease-emph) 0.16s both; }
+@keyframes lk-fill { from { transform: scaleX(0); } }
+.lk-steps li { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 0 4px; text-align: center; font-size: 0.8rem; line-height: 1.3; color: var(--muted); }
+.lk-dot {
+  width: 33px; height: 33px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 0.8rem; font-weight: 600;
+  background: var(--surface); color: var(--muted); box-shadow: inset 0 0 0 2px var(--fill);
+  transition: background var(--dur-2) var(--lk-ease), box-shadow var(--dur-2) var(--lk-ease), color var(--dur-2) var(--lk-ease);
+}
+.lk-steps li.past { color: var(--text-2); }
+.lk-steps li.past .lk-dot { background: var(--s-done); color: #fff; box-shadow: none; }
+.lk-steps li.on { color: var(--text); font-weight: 600; }
+.lk-steps li.on .lk-dot { background: var(--c); color: #fff; box-shadow: 0 0 0 5px color-mix(in srgb, var(--c) 20%, transparent); animation: lk-pop var(--dur-3) var(--ease-emph) 0.24s both; }
+@keyframes lk-pop { from { transform: scale(0.8); } }
+.lk-step-label { display: flex; flex-direction: column; align-items: center; gap: 3px; overflow-wrap: anywhere; }
+.lk-now { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: color-mix(in srgb, var(--c) 75%, var(--text)); }
+
+/* Riwayat */
+.lk-history-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 20px; }
+.lk-history h2 { font-size: 1.19rem; letter-spacing: -0.02em; }
+.lk-timeline { list-style: none; margin: 0; padding: 0; }
+.lk-timeline li { position: relative; display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 2px 16px; padding-bottom: 22px; }
+.lk-timeline li:last-child { padding-bottom: 0; }
+.lk-timeline li:not(:last-child)::before { content: ''; position: absolute; left: 5px; top: 20px; bottom: 2px; width: 2px; border-radius: 1px; background: var(--fill); }
+.lk-tl-dot { width: 12px; height: 12px; margin-top: 6px; border-radius: 50%; background: var(--surface); box-shadow: inset 0 0 0 2px var(--border); }
+.lk-timeline li.now .lk-tl-dot { background: var(--c); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 20%, transparent); }
+.lk-tl-main { min-width: 0; }
+.lk-tl-main b { display: block; font-weight: 600; }
+.lk-timeline li:not(.now) .lk-tl-main b { font-weight: 500; color: var(--text-2); }
+.lk-tl-main span { font-size: 0.84rem; color: var(--muted); }
+.lk-timeline time { text-align: right; font-size: 0.875rem; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lk-timeline time span { display: block; font-size: 0.8rem; color: var(--muted); }
+
+/* Tombol di bawah */
+.lk-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; padding: 0 2px; }
+.lk-actions .btn { background: var(--surface); box-shadow: var(--e1); transition: box-shadow var(--dur-2) var(--lk-ease), background var(--dur-2) var(--lk-ease); }
+.lk-actions .btn:hover:not(:disabled) { background: var(--surface); box-shadow: var(--e2); }
+.lk-updated { font-size: 0.8rem; color: var(--muted); }
+.lk-updated.error { color: var(--danger); }
+.lk-privacy { display: flex; align-items: flex-start; gap: 8px; padding: 0 4px; font-size: 0.8rem; line-height: 1.45; color: var(--muted); }
+.lk-privacy svg { margin-top: 1px; }
+.lk-foot { max-width: var(--lk-w); margin: 32px auto 0; text-align: center; font-size: 0.75rem; color: var(--muted); }
+
+/* ---------- Beberapa dokumen ---------- */
+.lk-list-title { margin-top: 0; }
+.lk-list { list-style: none; margin: 20px -12px 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.lk-row {
+  display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 14px; color: var(--text); text-decoration: none;
+  transition: background var(--dur-2) var(--lk-ease);
+}
+.lk-row:hover { background: var(--fill-2); }
+.lk-row .app-icon.sm { width: 32px; height: 32px; border-radius: 9px; }
+.lk-row-main { flex: 1; min-width: 0; }
+.lk-row-main b { font-weight: 600; }
+.lk-row-meta { display: block; font-size: 0.8rem; color: var(--muted); margin-top: 1px; }
+.lk-mini { display: block; max-width: 240px; height: 4px; margin-top: 8px; border-radius: 2px; background: var(--fill); overflow: hidden; }
+.lk-mini i { display: block; height: 100%; border-radius: inherit; background: var(--c); transform-origin: left center; transform: scaleX(var(--p)); animation: lk-fill var(--dur-4) var(--ease-emph) 0.16s both; }
+.lk-row .pill { flex: none; }
+.lk-chev { color: var(--muted); opacity: 0.7; flex: none; transition: transform var(--dur-2) var(--lk-ease); }
+.lk-row:hover .lk-chev { transform: translateX(2px); }
+.lk-missing { margin: 16px 0 0; }
+
+/* ---------- Kendala ---------- */
+.lk-problem { margin-top: clamp(8px, 5vh, 56px); }
+.lk-stack > .lk-problem:not(:first-child) { margin-top: 0; }
+.lk-problem .lk-mark { background: var(--fill-2); color: var(--muted); box-shadow: none; }
+.lk-problem h1 { font-size: 1.9rem; }
+.lk-problem > .pill-btn { margin-top: 14px; gap: 8px; }
+
+/* ---------- Memuat ---------- */
+.lk-skel i, .lk-skel-line {
+  display: block; height: 14px; margin-top: 12px; border-radius: 7px;
+  position: relative; overflow: hidden; background: var(--fill-2);
+}
+/* Kilau bergeser lewat transform (sama dengan .sk di styles.css). */
+.lk-skel i::after, .lk-skel-line::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--shimmer), transparent); animation: lk-shimmer 1.4s var(--ease-standard) infinite;
+}
+.lk-skel-line { margin: 0; height: 18px; }
+.lk-skel i:first-child { margin-top: 0; }
+.lk-skel i.h { height: 30px; margin-top: 20px; border-radius: 9px; }
+.lk-skel i.box { height: 110px; margin-top: 26px; border-radius: 18px; }
+.lk-skel i.steps { height: 34px; margin-top: 26px; border-radius: 17px; }
+@keyframes lk-shimmer { to { transform: translateX(100%); } }
+
+/* ---------- Kode lacak di formulir pendaftaran TTD EVP ---------- */
+.lk-doc-list { gap: 14px; }
+.lk-doc-code { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 8px; }
+.lk-doc-code .lk-code { box-shadow: none; background: var(--fill-2); }
+.lk-doc-code .link { text-decoration: none; font-size: 0.875rem; }
+.lk-doc-code .link:hover { text-decoration: underline; }
+.lk-doc-code .lk-code:hover { background: var(--fill); box-shadow: none; }
+.lk-doc-code b, .public .lk-code b { font-family: var(--mono); }
+.lk-doc-track {
+  width: 100%; display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: lk-in var(--dur-4) var(--ease-emph) 0.1s both;
+}
+.lk-doc-track > svg { color: var(--accent); }
+.lk-doc-track .pill-btn { text-decoration: none; flex: none; }
+
+/* ---------- HP ---------- */
+@media (max-width: 640px) {
+  .lk-card { padding: 24px 20px; border-radius: 20px; }
+  .lk-search { margin-top: 8px; padding: 32px 20px 24px; }
+  .lk-search h1 { font-size: 1.9rem; }
+  .lk-lead { font-size: 1rem; }
+  .lk-form { flex-direction: column; }
+  .lk-go { width: 100%; }
+  .lk-title { font-size: 1.6rem; margin-top: 12px; }
+  .lk-status { padding: 16px; gap: 12px; margin-top: 20px; }
+  .lk-status-icon { width: 36px; height: 36px; }
+  .lk-status h2 { font-size: 1.2rem; }
+  .lk-status p { font-size: 0.94rem; }
+
+  /* Tahap menurun */
+  .lk-steps { grid-template-columns: minmax(0, 1fr); margin-top: 24px; }
+  .lk-steps::before, .lk-steps::after { display: none; }
+  .lk-steps li { flex-direction: row; align-items: flex-start; gap: 14px; padding: 0 0 16px; text-align: left; font-size: 0.94rem; }
+  .lk-steps li:last-child { padding-bottom: 0; }
+  .lk-steps li:not(:last-child)::before { content: ''; position: absolute; left: 15px; top: 36px; bottom: 3px; width: 3px; border-radius: 2px; background: var(--fill); }
+  .lk-steps li.past::before { background: var(--s-done); }
+  .lk-step-label { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 2px 10px; padding-top: 6px; }
+  .lk-steps li.on .lk-dot { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 20%, transparent); }
+
+  .lk-timeline li { grid-template-columns: 12px minmax(0, 1fr); }
+  .lk-timeline time { grid-column: 2; text-align: left; font-size: 0.84rem; color: var(--muted); }
+  .lk-timeline time span { display: inline; font-size: inherit; }
+  .lk-timeline time span::before { content: ', '; }
+
+  .lk-list { margin: 16px -8px 0; }
+  .lk-row { position: relative; flex-wrap: wrap; padding: 12px 32px 12px 8px; gap: 10px 12px; }
+  .lk-row-main { flex-basis: calc(100% - 44px); }
+  .lk-row .pill { margin-left: 44px; }
+  /* Panah tetap tampil di tepi kanan agar baris jelas bisa diketuk. */
+  .lk-row .lk-chev { position: absolute; right: 8px; top: 50%; margin-top: -8px; }
+
+  .lk-actions .grow { display: none; }
+  .lk-updated { order: 3; width: 100%; padding-left: 4px; }
+  .lk-doc-track { flex-wrap: wrap; }
+  .lk-doc-track .pill-btn { width: 100%; min-height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lk *, .lk *::before, .lk *::after { animation: none !important; transition: none !important; }
+}

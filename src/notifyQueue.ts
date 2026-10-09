@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react';
 import { sendNotify, type DocRecord, type NotifyResult } from './backend';
 import { CONTACT_NAME, notifyKey, type ModuleDef, type ModuleId } from './modules';
 import { waNumber } from './util';
+import { ownTabJustOpened } from './ownTab';
 
 export const NOTIFY_WAIT_MS = 60_000;
 
@@ -93,11 +94,12 @@ export async function flush(key: string, keepalive = false) {
 }
 
 // Saat halaman ditutup atau aplikasi di HP dipindah ke latar belakang, kirim semua antrean.
+// Tersembunyi karena aplikasi sendiri membuka tab cetak, laporan, atau lacak tidak dihitung.
 if (typeof window !== 'undefined') {
   const flushAll = () => batches.map((b) => b.key).forEach((k) => void flush(k, true));
   addEventListener('pagehide', flushAll);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushAll();
+    if (document.visibilityState === 'hidden' && !ownTabJustOpened()) flushAll();
   });
 }
 

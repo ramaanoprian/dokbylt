@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DatabaseBackup, Download, FileText, KeyRound, LogOut, Menu as Menu2, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
+import { DatabaseBackup, Download, FileChartColumn, FileText, KeyRound, LogOut, Menu as Menu2, Moon, Search, Sun, Upload, Users, X } from 'lucide-react';
 import { Menu } from './Menu';
 import { MODULES, moduleById, type ModuleId } from './modules';
 import { isOnline, useBackend, type DataStore } from './backend';
@@ -15,6 +15,8 @@ import { BackupDialog } from './BackupDialog';
 import { collectReminders } from './reminders';
 import { useToast } from './toast';
 import { exportJson, isDone, readPref, writePref } from './util';
+import { ReportLoader } from './report/LazyReport';
+import { withTransition } from './motion';
 
 type Page = 'ringkasan' | 'aktivitas' | ModuleId;
 
@@ -29,6 +31,7 @@ export default function App() {
   const [navOpen, setNavOpen] = useState(false);
   const [staffOpen, setStaffOpen] = useState(false);
   const [backupOpen, setBackupOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [openId, setOpenId] = useState<string | undefined>();
   const [dark, setDark] = useState(() => {
@@ -56,11 +59,15 @@ export default function App() {
     document.documentElement.classList.toggle('lock', navOpen);
   }, [navOpen]);
 
+  // Ganti tema dengan sapuan pudar singkat (View Transitions), tanpa animasi di browser lama.
   const toggleTheme = useCallback(() => {
-    setDark((d) => {
-      writePref('theme', d ? 'light' : 'dark');
-      return !d;
-    });
+    withTransition('theme', () =>
+      setDark((d) => {
+        writePref('theme', d ? 'light' : 'dark');
+        document.documentElement.dataset.theme = d ? 'light' : 'dark';
+        return !d;
+      }),
+    );
   }, []);
 
   // Ctrl/Cmd+K atau "/" membuka pencarian cepat.
@@ -78,14 +85,18 @@ export default function App() {
   }, []);
 
   const go = useCallback((p: Page, id?: string) => {
-    location.hash = p === 'ringkasan' ? '' : p;
-    setPage(p);
-    setOpenId(id);
-    setNavOpen(false);
-    scrollTo(0, 0);
+    withTransition('nav', () => {
+      location.hash = p === 'ringkasan' ? '' : p;
+      setPage(p);
+      setOpenId(id);
+      setNavOpen(false);
+      scrollTo(0, 0);
+    });
   }, []);
   const clearOpen = useCallback(() => setOpenId(undefined), []);
   const closeStaff = useCallback(() => setStaffOpen(false), []);
+  const openReport = useCallback(() => setReportOpen(true), []);
+  const closeReport = useCallback(() => setReportOpen(false), []);
   const { uploadFile, fileUrl, removeFile } = be;
   const files = useMemo(() => ({ upload: uploadFile, url: fileUrl, remove: removeFile }), [uploadFile, fileUrl, removeFile]);
 
@@ -211,6 +222,7 @@ export default function App() {
       ...(!isOnline ? [{ icon: <Upload size={16} />, label: 'Pulihkan dari cadangan', run: () => fileRef.current?.click() }] : []),
     ],
     [
+      { icon: <FileChartColumn size={16} />, label: 'Laporan bulanan', run: openReport },
       ...(isOnline ? [{ icon: <DatabaseBackup size={16} />, label: 'Rekap & cadangan', run: () => setBackupOpen(true) }] : []),
       ...(isOnline && be.isAdmin ? [{ icon: <Users size={16} />, label: 'Kelola peran staf', run: () => setStaffOpen(true) }] : []),
     ],
@@ -325,7 +337,7 @@ export default function App() {
       <main>
         {be.loading && <div className="loading-bar" />}
         {page === 'ringkasan' ? (
-          <Overview data={data} activity={be.activity} loading={be.loading} go={go} />
+          <Overview data={data} activity={be.activity} loading={be.loading} go={go} onReport={openReport} />
         ) : page === 'aktivitas' ? (
           <ActivityPage activity={be.activity} go={go} />
         ) : (
@@ -359,6 +371,7 @@ export default function App() {
         <StaffDialog meId={be.user.id} load={be.listStaff} setRole={be.setStaffRole} onClose={closeStaff} />
       )}
       {backupOpen && <BackupDialog data={data} onClose={() => setBackupOpen(false)} />}
+      {reportOpen && <ReportLoader data={data} activity={be.activity} userName={userName} onClose={closeReport} />}
       {paletteOpen && (
         <CommandPalette
           data={data}

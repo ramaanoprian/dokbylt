@@ -3,17 +3,20 @@ import { ChevronRight, GripVertical } from 'lucide-react';
 import type { ModuleDef } from './modules';
 import type { DocRecord } from './backend';
 import { REMIND_DAYS, daysSince, daysUntil, deadlineOf, dueLabel, dueTone, fmtDate, lastMove, shown } from './util';
+import { stageClass } from './stats';
 
 interface Props {
   mod: ModuleDef;
   rows: DocRecord[];
   onOpen: (r: DocRecord) => void;
   onMove: (r: DocRecord, status: string) => void;
+  /** Data yang sedang dibuka di panel rincian, ditandai di papan. */
+  activeId?: string;
 }
 
 const titleOf = (v: Record<string, string>) => v.perihal || v.kegiatan || v.uraian || v.keperluan || v.tujuan || v.asal || '(tanpa judul)';
 
-export function Board({ mod, rows, onOpen, onMove }: Props) {
+export function Board({ mod, rows, onOpen, onMove, activeId }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
   const meta = mod.fields.filter((f) => f.inTable && f.type === 'select').slice(0, 2);
@@ -46,7 +49,7 @@ export function Board({ mod, rows, onOpen, onMove }: Props) {
             }}
           >
             <div className="col-head">
-              <span className={'col-dot ' + (i === last ? 'done' : `s${i}`)} />
+              <span className={'col-dot ' + stageClass(mod, s)} />
               <span className="grow">{s}</span>
               <span className="col-count">{all.length}</span>
             </div>
@@ -62,7 +65,8 @@ export function Board({ mod, rows, onOpen, onMove }: Props) {
                 return (
                   <article
                     key={r.id}
-                    className={'kcard' + (dragId === r.id ? ' dragging' : '')}
+                    data-rid={r.id}
+                    className={'kcard' + (dragId === r.id ? ' dragging' : '') + (activeId === r.id ? ' ux-active' : '')}
                     draggable
                     onDragStart={(e) => {
                       setDragId(r.id);

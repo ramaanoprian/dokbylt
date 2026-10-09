@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import QRCode from 'qrcode';
 import { Copy, Printer, QrCode, X } from 'lucide-react';
 import { useToast } from './toast';
+import { openOwnTab } from './ownTab';
 
 /** QR formulir publik (pinjam drone, daftar dokumen TTD EVP, kirim paket) yang bisa dicetak dan ditempel. */
 export interface QrForm {
@@ -60,7 +61,7 @@ function QrDialog({ form, onClose }: { form: QrForm; onClose: () => void }) {
   }, [onClose]);
 
   const print = () => {
-    const w = window.open('', '_blank');
+    const w = openOwnTab();
     if (!w) return;
     w.document.write(`<!doctype html><meta charset="utf-8"><title>QR ${form.title}</title>
 <style>body{font-family:Inter,system-ui,sans-serif;text-align:center;padding:48px;color:#1d1d1f}

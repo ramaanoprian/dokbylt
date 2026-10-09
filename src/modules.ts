@@ -12,6 +12,8 @@ export interface Field {
   inTable?: boolean;
   placeholder?: string;
   hint?: string;
+  /** Tanggal yang tidak diisi otomatis dengan hari ini saat data baru dibuat, mis. tanggal disposisi. */
+  blank?: boolean;
 }
 
 export interface ModuleDef {
@@ -50,6 +52,10 @@ export const UNITS = ['Rencana', 'Logistik', 'Keuangan', 'SDM', 'Dokumen', 'Lain
 /** Unit yang biasa meminjam drone. */
 export const DRONE_UNITS = ['SDM', 'Quality Control', 'Fasilitas', 'Rencana', 'Logistik', 'Keuangan', 'Lainnya'];
 export const DRONE_STATUSES = ['Diajukan', 'Disetujui', 'Dipinjam', 'Dikembalikan'];
+/** Tahap surat masuk: dicatat, diberi disposisi oleh EVP, lalu diteruskan ke unit. */
+export const SURAT_STATUSES = ['Didata', 'Didisposisi EVP', 'Didistribusikan'];
+/** Sifat surat pada lembar disposisi. */
+export const SIFAT_SURAT = ['Biasa', 'Segera', 'Rahasia', 'Penting'];
 export const POS_STATUSES = [
   'Didaftarkan unit',
   'Diterima dari unit',
@@ -113,7 +119,8 @@ export const MODULES: ModuleDef[] = [
     dueDays: 2,
     title: 'Surat Masuk',
     menu: 'Surat Masuk',
-    description: 'Surat dari luar yang masuk ke unit dokumen: didata lalu didistribusikan sesuai tujuan pada map.',
+    description:
+      'Surat dari luar yang masuk ke unit dokumen: didata, diberi disposisi oleh EVP, lalu didistribusikan ke unit sesuai disposisi.',
     icon: 'surat',
     itemName: 'surat',
     dateField: 'tanggalTerima',
@@ -124,6 +131,7 @@ export const MODULES: ModuleDef[] = [
       { key: 'tanggalSurat', label: 'Tanggal surat', type: 'date', inTable: true },
       { key: 'asal', label: 'Asal / pengirim', type: 'text', required: true, inTable: true },
       { key: 'perihal', label: 'Perihal', type: 'text', required: true, inTable: true },
+      { key: 'sifat', label: 'Sifat', type: 'select', options: SIFAT_SURAT },
       {
         key: 'tujuan',
         label: 'Tujuan (sesuai map)',
@@ -132,11 +140,25 @@ export const MODULES: ModuleDef[] = [
         required: true,
         inTable: true,
       },
+      {
+        key: 'disposisiKepada',
+        label: 'Diteruskan kepada',
+        type: 'select',
+        options: UNITS,
+        hint: 'Unit yang ditunjuk EVP pada lembar disposisi',
+      },
+      { key: 'tanggalDisposisi', label: 'Tanggal disposisi', type: 'date', blank: true },
+      {
+        key: 'isiDisposisi',
+        label: 'Isi disposisi EVP',
+        type: 'textarea',
+        hint: 'Salin arahan EVP dari lembar disposisi, mis. “Tindak lanjuti dan laporkan hasilnya”.',
+      },
       { key: 'penerima', label: 'Diterima oleh', type: 'text' },
       { key: 'catatan', label: 'Catatan', type: 'textarea' },
     ],
-    statuses: ['Didata', 'Didistribusikan'],
-    requiredForStatus: { Didistribusikan: ['penerima'] },
+    statuses: SURAT_STATUSES,
+    requiredForStatus: { 'Didisposisi EVP': ['isiDisposisi', 'disposisiKepada'], Didistribusikan: ['penerima'] },
   },
   {
     id: 'keluar',
@@ -312,3 +334,16 @@ export const CONTACT_NAME: Record<string, string> = { kontakPic: 'pic', kontakKu
 export const firstStatus = (mod: ModuleDef) => mod.statuses.find((s) => s !== mod.preStatus) ?? mod.statuses[0];
 
 export const moduleById = (id: string) => MODULES.find((m) => m.id === id)!;
+
+/**
+ * Isian wajib tiap tahap sampai tahap `status`. Untuk data tersimpan, tahap sebelum tahapnya sekarang
+ * sudah dilewati: isiannya hanya wajib bila sudah terisi (tidak boleh dikosongkan). Dengan begitu data
+ * lama yang melompati tahap baru, mis. surat yang didistribusikan sebelum ada tahap disposisi EVP, tetap
+ * bisa disunting tanpa mengarang isian yang tidak pernah ada.
+ */
+export function stageNeeds(mod: ModuleDef, status: string, record?: { status: string; values: Record<string, string> }) {
+  const saved = record ? mod.statuses.indexOf(record.status) : -1;
+  return mod.statuses
+    .slice(0, mod.statuses.indexOf(status) + 1)
+    .flatMap((s, i) => (mod.requiredForStatus?.[s] ?? []).filter((k) => i >= saved || !!record?.values[k]?.trim()));
+}
