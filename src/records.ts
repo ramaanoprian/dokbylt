@@ -1,5 +1,5 @@
 // Aturan bersama untuk satu data: judul, tahap berikutnya, dan isian wajib sebelum pindah tahap.
-import type { ModuleDef } from './modules';
+import { stageNeeds, type ModuleDef } from './modules';
 import type { DocRecord } from './backend';
 
 /** Kolom yang paling menggambarkan data; dipakai sebagai judul. */
@@ -16,12 +16,14 @@ export function nextStatus(mod: ModuleDef, r: DocRecord) {
 
 /**
  * Isian wajib yang belum terisi untuk masuk ke tahap `target`. Hanya dicek saat maju, tidak saat
- * dikembalikan ke tahap sebelumnya. Isian tahap-tahap yang dilompati ikut diperiksa.
+ * dikembalikan ke tahap sebelumnya. Isian tahap-tahap yang dilompati ikut diperiksa, kecuali tahap
+ * sebelum tahap data sekarang (lihat stageNeeds).
  */
 export function missingFor(mod: ModuleDef, r: DocRecord, target: string) {
   const t = mod.statuses.indexOf(target);
   if (t <= mod.statuses.indexOf(r.status)) return [];
-  const keys = [...new Set(mod.statuses.slice(0, t + 1).flatMap((s) => mod.requiredForStatus?.[s] ?? []))];
+  // Sama dengan form: isian tahap yang sudah dilewati data lama tidak ditagih lagi.
+  const keys = [...new Set(stageNeeds(mod, target, r))];
   return keys
     .filter((k) => !r.values[k]?.trim())
     .map((k) => ({ key: k, label: mod.fields.find((f) => f.key === k)?.label ?? k }));
