@@ -70,6 +70,12 @@ export function RecordDetail({ mod, record: r, gone, position, onPrev, onNext, o
     if (closing.current) return;
     closing.current = true;
     if (reducedMotion()) return onClose();
+    // Sesudah lembar digeser lalu batal, animasi CSS dimatikan lewat gaya inline: tutup dengan transisi saja.
+    const el = panelRef.current;
+    if (el?.style.animationName === 'none') {
+      el.style.transition = 'transform 0.22s cubic-bezier(0.4, 0, 1, 1)';
+      el.style.transform = isPhone() ? 'translateY(100%)' : 'translateX(100%)';
+    }
     setLeaving(true);
     setTimeout(onClose, 200);
   }, [onClose]);

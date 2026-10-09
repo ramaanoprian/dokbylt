@@ -194,23 +194,32 @@ export function ModulePage({
 
   // Daftar panjang: 50 dulu. Kembali ke 50 saat pencarian, saringan, urutan, atau tahap berubah.
   const pageKey = `${q}|${saring.unit}|${saring.month}|${sort.key}:${sort.dir}|${statusFilter}`;
-  const [more, setMore] = useState({ key: '', n: PAGE });
-  const limit = more.key === pageKey ? more.n : PAGE;
-  const visible = useMemo(() => filtered.slice(0, limit), [filtered, limit]);
+  const [more, setMore] = useState({ key: pageKey, n: PAGE });
   // Baris yang baru dimunculkan "Tampilkan lagi" diberi animasi masuk.
   const freshFrom = useRef(0);
+  if (more.key !== pageKey) {
+    // Disetel ulang sungguhan, agar kembali ke tab atau pencarian lama tidak memunculkan halaman lamanya.
+    freshFrom.current = 0;
+    setMore({ key: pageKey, n: PAGE });
+  }
+  const limit = more.key === pageKey ? more.n : PAGE;
+  const visible = useMemo(() => filtered.slice(0, limit), [filtered, limit]);
   const showMore = () => {
     freshFrom.current = visible.length;
     setMore({ key: pageKey, n: limit + PAGE });
   };
-  if (more.key !== pageKey) freshFrom.current = 0;
 
   // Pilihan untuk pindah banyak sekaligus; hilang saat saringan atau tampilan berubah.
   const selKey = `${q}|${saring.unit}|${saring.month}|${statusFilter}|${view}`;
-  const [sel, setSel] = useState({ key: '', ids: NONE });
+  const [sel, setSel] = useState({ key: selKey, ids: NONE });
+  const anchor = useRef<string | null>(null);
+  if (sel.key !== selKey) {
+    // Dibuang sungguhan, bukan hanya disembunyikan, agar tidak muncul lagi saat saringan dikembalikan.
+    anchor.current = null;
+    setSel({ key: selKey, ids: NONE });
+  }
   const selIds = sel.key === selKey ? sel.ids : NONE;
   const selected = useMemo(() => filtered.filter((r) => selIds.has(r.id)), [filtered, selIds]);
-  const anchor = useRef<string | null>(null);
   const setSelIds = (ids: Set<string>) => setSel({ key: selKey, ids });
   const clearSel = () => {
     setSelIds(NONE);
@@ -233,12 +242,11 @@ export function ModulePage({
   const allVisibleOn = visible.length > 0 && visible.every((r) => selIds.has(r.id));
   const someVisibleOn = !allVisibleOn && visible.some((r) => selIds.has(r.id));
   const toggleAllVisible = () => {
-    const next = new Set(selected.map((r) => r.id));
-    for (const r of visible) {
-      if (allVisibleOn) next.delete(r.id);
-      else next.add(r.id);
-    }
     anchor.current = null;
+    // Melepas centang kepala membuang semua pilihan, termasuk baris di luar yang tampil ("Pilih semua N").
+    if (allVisibleOn) return setSelIds(NONE);
+    const next = new Set(selected.map((r) => r.id));
+    for (const r of visible) next.add(r.id);
     setSelIds(next);
   };
   const headCheck = useRef<HTMLInputElement>(null);
@@ -309,13 +317,13 @@ export function ModulePage({
         setEditing({});
       } else if (e.key === 'Escape' && !detail && (selIds.size || picking)) {
         e.preventDefault();
-        setSel({ key: '', ids: NONE });
+        setSel({ key: selKey, ids: NONE });
         setPicking(false);
       }
     };
     addEventListener('keydown', on);
     return () => removeEventListener('keydown', on);
-  }, [editing, detail, selIds, picking]);
+  }, [editing, detail, selIds, selKey, picking]);
 
   // Versi terbaru data untuk aksi yang dijalankan belakangan (mis. tombol di toast).
   const rowsRef = useRef(rows);
@@ -400,8 +408,17 @@ export function ModulePage({
               label: 'Urungkan',
               run: () => {
                 const t = new Date().toISOString();
-                summarizeInstant(moved.map((m) => saveAndNotify(stamp(m.after, m.before.status, t), m.after, true)));
-                toast(`Pemindahan ${moved.length} ${mod.itemName} diurungkan`);
+                // Pakai versi terbaru; lewati data yang sudah dihapus atau sudah dipindah lagi sejak itu.
+                const back = moved.flatMap((m) => {
+                  const latest = rowsRef.current.find((x) => x.id === m.after.id);
+                  return latest && latest.status === m.after.status ? [{ latest, to: m.before.status }] : [];
+                });
+                if (back.length) summarizeInstant(back.map((b) => saveAndNotify(stamp(b.latest, b.to, t), b.latest, true)));
+                const skipped = moved.length - back.length;
+                toast(
+                  `Pemindahan ${back.length} ${mod.itemName} diurungkan` +
+                    (skipped ? `, ${skipped} dilewati karena sudah berubah` : ''),
+                );
               },
             },
           ]

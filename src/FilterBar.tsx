@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, X } from 'lucide-react';
 import type { Field, ModuleDef } from './modules';
 import type { DocRecord } from './backend';
@@ -94,6 +94,18 @@ export function FilterChip({ name, all, value, options, onChange }: ChipProps) {
       removeEventListener('mousedown', click);
       removeEventListener('keydown', key, true);
     };
+  }, [open]);
+
+  // Pilihan yang terbuka dijaga tetap di dalam layar (chip di kanan pada layar HP).
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const wrap = wrapRef.current;
+    if (!open || !list || !wrap) return;
+    const left = wrap.getBoundingClientRect().left;
+    const over = left + list.offsetWidth - (document.documentElement.clientWidth - 16);
+    const shift = over > 0 ? Math.min(over, Math.max(0, left - 16)) : 0;
+    list.style.left = shift ? `${-shift}px` : '';
+    list.style.transformOrigin = shift ? 'top right' : '';
   }, [open]);
 
   const pick = (v: string) => {

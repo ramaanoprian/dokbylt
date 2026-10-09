@@ -188,6 +188,16 @@ body:has(.ux-bulk.on) .toasts { bottom: 96px; }
   body:has(.ux-bulk.on) .notify-tray { bottom: 96px; }
   body:has(.ux-detail) .notify-tray { right: calc(min(520px, 100vw) + 20px); }
 }
+/* Layar sempit: panel rincian menutupi halaman, jadi antrean WA dan toast pindah ke atas kaki panel. */
+@media (max-width: 1000px) {
+  .notify-tray { transition: top 0.28s var(--ux-ease), bottom 0.28s var(--ux-ease); }
+  body:has(.ux-detail) .notify-tray { top: auto; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  body:has(.ux-detail) .toasts { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  body:has(.ux-detail):has(.toast-item) .notify-tray { bottom: calc(144px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (min-width: 735px) and (max-width: 1000px) {
+  body:has(.ux-detail) .notify-tray { left: auto; width: min(400px, calc(100vw - 32px)); }
+}
 
 /* ---------- Panel rincian ---------- */
 html.ux-lock { overflow: hidden; }
@@ -322,9 +332,10 @@ html.ux-lock { overflow: hidden; }
   .ux-toolbar .controls .sort-ctl { flex: 1; min-width: 0; margin-left: 0; }
   .ux-toolbar .controls .sort-ctl select { flex: 1; max-width: none; min-height: 40px; font-size: 0.94rem; }
   .ux-toolbar .controls .segmented button { min-height: 36px; }
-  .ux-filters { flex-wrap: nowrap; }
+  .ux-filters { flex-wrap: wrap; row-gap: 8px; }
+  .ux-filters .spacer { display: none; }
   .ux-chip-v { max-width: 110px; }
-  .ux-pick { display: inline-flex; }
+  .ux-pick { display: inline-flex; margin-left: auto; }
   .ux-clear { display: none; }
 
   .ux-bulk {
