@@ -45,7 +45,7 @@ const MENU: Record<string, { menu: string; statuses: string[] }> = {
     menu: 'TTD EVP',
     statuses: ['Didaftarkan unit', 'Diterima dari unit', 'Diserahkan ke EVP', 'Ditandatangani EVP', 'Didistribusikan ke unit'],
   },
-  surat: { menu: 'Surat Masuk', statuses: ['Didata', 'Didistribusikan'] },
+  surat: { menu: 'Surat Masuk', statuses: ['Didata', 'Didisposisi EVP', 'Didistribusikan'] },
   keluar: { menu: 'Surat Keluar', statuses: ['Didata', 'Ditandatangani', 'Dikirim'] },
   pos: {
     menu: 'Kantor Pos',
