@@ -13,7 +13,10 @@ interface Props {
   items: Attachment[];
   userName: string;
   files: FileApi;
-  onChange: (items: Attachment[]) => void;
+  /** Ubahan daftar lampiran dalam bentuk fungsi, agar unggahan yang selesai belakangan tidak menimpa isian lain. */
+  onChange: (update: (cur: Attachment[]) => Attachment[]) => void;
+  /** Dipanggil saat unggahan mulai dan selesai, agar form bisa menahan Simpan. */
+  onBusy?: (busy: boolean) => void;
 }
 
 const MAX_SIDE = 1800;
@@ -37,6 +40,26 @@ export async function shrink(file: File): Promise<Blob> {
 }
 
 const safeName = (n: string) => n.replace(/[^\w.-]+/g, '_').slice(-80);
+
+/**
+ * Unggah satu berkas sebagai lampiran (foto diperkecil dulu). Hasilnya data lampiran, pesan galat jenis atau
+ * ukuran berkas, atau null bila unggahan gagal (galatnya sudah ditampilkan backend).
+ * Dipakai juga oleh "Isi dari PDF / foto surat" agar berkasnya ikut terlampir dengan cara yang sama.
+ */
+export async function uploadAttachment(f: File, folder: string, userName: string, files: FileApi): Promise<Attachment | string | null> {
+  // Sebagian perangkat mengirim PDF tanpa jenis berkas yang benar; kenali dari namanya.
+  if (!/^image\/|^application\/pdf$/.test(f.type) && /\.pdf$/i.test(f.name)) {
+    f = new File([f], f.name, { type: 'application/pdf', lastModified: f.lastModified });
+  }
+  if (!/^image\/|^application\/pdf$/.test(f.type)) return 'Hanya foto (JPG/PNG) dan PDF yang bisa dilampirkan.';
+  const blob = await shrink(f);
+  if (blob.size > 10_000_000) return `${f.name} lebih dari 10 MB.`;
+  const name = blob === f ? f.name : f.name.replace(/\.\w+$/, '') + '.jpg';
+  const path = await files.upload(`${folder}/${Date.now()}-${safeName(name)}`, blob);
+  if (!path) return null;
+  return { path, name, type: blob.type || f.type, size: blob.size, at: new Date().toISOString(), by: userName };
+}
+
 const fmtSize = (b: number) => (b > 1_000_000 ? `${(b / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1000))} KB`);
 
 function Thumb({ a, files }: { a: Attachment; files: FileApi }) {
@@ -56,11 +79,13 @@ function Thumb({ a, files }: { a: Attachment; files: FileApi }) {
   );
 }
 
-export function Attachments({ folder, items, userName, files, onChange }: Props) {
+export function Attachments({ folder, items, userName, files, onChange, onBusy }: Props) {
   const [busy, setBusy] = useState(0);
   const [err, setErr] = useState('');
   const pickRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  const uploading = busy > 0;
+  useEffect(() => onBusy?.(uploading), [uploading, onBusy]);
 
   const add = async (list: FileList | null) => {
     if (!list?.length) return;
@@ -68,26 +93,18 @@ export function Attachments({ folder, items, userName, files, onChange }: Props)
     setBusy(list.length);
     const added: Attachment[] = [];
     for (const f of Array.from(list)) {
-      if (!/^image\/|^application\/pdf$/.test(f.type)) {
-        setErr('Hanya foto (JPG/PNG) dan PDF yang bisa dilampirkan.');
-        continue;
-      }
-      const blob = await shrink(f);
-      if (blob.size > 10_000_000) {
-        setErr(`${f.name} lebih dari 10 MB.`);
-        continue;
-      }
-      const name = blob === f ? f.name : f.name.replace(/\.\w+$/, '') + '.jpg';
-      const path = await files.upload(`${folder}/${Date.now()}-${safeName(name)}`, blob);
-      if (path) added.push({ path, name, type: blob.type || f.type, size: blob.size, at: new Date().toISOString(), by: userName });
+      const a = await uploadAttachment(f, folder, userName, files);
+      if (typeof a === 'string') setErr(a);
+      else if (a) added.push(a);
       setBusy((n) => n - 1);
     }
     setBusy(0);
-    if (added.length) onChange([...items, ...added]);
+    // Digabung ke daftar terbaru, bukan daftar saat berkas dipilih.
+    if (added.length) onChange((cur) => [...cur, ...added.filter((a) => !cur.some((x) => x.path === a.path))]);
   };
 
   // Berkas baru benar-benar dihapus dari penyimpanan saat form disimpan.
-  const drop = (a: Attachment) => onChange(items.filter((x) => x.path !== a.path));
+  const drop = (a: Attachment) => onChange((cur) => cur.filter((x) => x.path !== a.path));
 
   return (
     <div className="attachments full">

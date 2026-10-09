@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, MessageCircle, Printer, X } from 'lucide-react';
 import { OTHER, firstStatus, otherKey, stageNeeds, type ModuleDef } from './modules';
 import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
@@ -6,8 +6,9 @@ import { trackCode } from './track';
 import { daysUntil, defaultDue, notifyUrl, dueLabel, dueTone, emailOf, fmtDateTime, resiMessage, today, waNumber } from './util';
 import { Icon } from './icons';
 import { stageClass } from './stats';
-import { Attachments, type FileApi } from './Attachments';
+import { Attachments, uploadAttachment, type FileApi } from './Attachments';
 import { printDisposition, printReceipt } from './print';
+import { PdfAutofill, canAutofill, type ScanUpload } from './pdfAutofill';
 
 interface Props {
   mod: ModuleDef;
@@ -93,6 +94,68 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
     setValues(next);
   };
 
+  // Isian dari PDF/foto surat: hanya field yang dicentang di langkah tinjau, lalu berpendar sebentar.
+  // Nilai bawaan form baru (mis. tanggal hari ini) dianggap belum diisi pengguna.
+  const [defaults] = useState(() => (record ? {} : values));
+  const [filled, setFilled] = useState<string[]>([]);
+  const applyScan = (patch: Record<string, string>) => {
+    setValues((v) => {
+      const next = { ...v, ...patch };
+      if (mod.dateField in patch && dueAuto && mod.fields.some((f) => f.key === 'tenggat')) {
+        const due = defaultDue(mod, next);
+        if (due) next.tenggat = due;
+      }
+      return next;
+    });
+    setFilled(Object.keys(patch));
+  };
+  useEffect(() => {
+    if (!filled.length) return;
+    const t = setTimeout(() => setFilled([]), 1800);
+    return () => clearTimeout(t);
+  }, [filled]);
+
+  // Unggahan lampiran yang belum selesai menahan Simpan, agar berkasnya tidak tertinggal.
+  const [scanBusy, setScanBusy] = useState(0);
+  const [attBusy, setAttBusy] = useState(false);
+  const waiting = scanBusy > 0 || attBusy;
+  // Isian terbaru, untuk dibaca setelah unggahan selesai.
+  const latest = useRef(values);
+  latest.current = values;
+  const folder = `${mod.id}/${id}`;
+  // Berkas surat diunggah sambil dibaca, tetapi baru masuk lampiran setelah isiannya diterapkan.
+  const uploadScan = (file: File): ScanUpload =>
+    uploadAttachment(file, folder, userName, files).then(
+      (a) => a ?? 'Berkas gagal diunggah.',
+      () => 'Berkas gagal diunggah.',
+    );
+  const keepScan = async (job: ScanUpload) => {
+    setScanBusy((n) => n + 1);
+    try {
+      const a = await job;
+      if (typeof a === 'string') return a;
+      // Berkas yang sama (nama dan ukuran) tidak dilampirkan dua kali; unggahan kembarnya dibuang.
+      const twin = attachmentsOf(latest.current).find((x) => x.path === a.path || (x.name === a.name && x.size === a.size));
+      if (twin) {
+        if (twin.path !== a.path) files.remove(a.path);
+        return null;
+      }
+      setValues((v) => {
+        const cur = attachmentsOf(v);
+        return cur.some((x) => x.path === a.path) ? v : { ...v, lampiran: JSON.stringify([...cur, a]) };
+      });
+      return null;
+    } finally {
+      setScanBusy((n) => n - 1);
+    }
+  };
+  // Pembacaan dibatalkan: unggahannya dihapus lagi dari penyimpanan.
+  const discardScan = (job: ScanUpload) => {
+    job.then((a) => {
+      if (typeof a !== 'string') files.remove(a.path);
+    });
+  };
+
   useEffect(() => {
     const on = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     addEventListener('keydown', on);
@@ -101,7 +164,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (blocked) return;
+    if (blocked || waiting) return;
     // Buang keterangan "Lainnya" yang tidak lagi dipakai.
     const clean = { ...values };
     for (const f of mod.fields) if (clean[f.key] !== OTHER) delete clean[otherKey(f.key)];
@@ -166,6 +229,17 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
         </header>
 
         <div className="sheet-body">
+          {canAutofill(mod) && (
+            <PdfAutofill
+              mod={mod}
+              values={values}
+              defaults={defaults}
+              onApply={applyScan}
+              upload={uploadScan}
+              keep={keepScan}
+              discard={discardScan}
+            />
+          )}
           <fieldset className="stepper">
             <legend>Tahap</legend>
             {mod.statuses.map((s, i) => {
@@ -194,7 +268,10 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
 
           <div className="form-grid">
             {mod.fields.map((f) => (
-              <label key={f.key} className={f.type === 'textarea' ? 'full' : ''}>
+              <label
+                key={f.key}
+                className={(f.type === 'textarea' ? 'full' : '') + (filled.includes(f.key) ? ' autofilled' : '')}
+              >
                 <span>
                   {f.label}
                   {needed.has(f.key) && <em className="req">*</em>}
@@ -308,11 +385,12 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
           )}
 
           <Attachments
-            folder={`${mod.id}/${id}`}
+            folder={folder}
             items={attachmentsOf(values)}
             userName={userName}
             files={files}
-            onChange={(list) => set('lampiran', JSON.stringify(list))}
+            onChange={(update) => setValues((v) => ({ ...v, lampiran: JSON.stringify(update(attachmentsOf(v))) }))}
+            onBusy={setAttBusy}
           />
 
 
@@ -370,8 +448,8 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
           <button type="button" className="btn" onClick={onClose}>
             Batal
           </button>
-          <button type="submit" className="pill-btn big" disabled={blocked}>
-            Simpan
+          <button type="submit" className="pill-btn big" disabled={blocked || waiting}>
+            {waiting ? 'Menunggu lampiran…' : 'Simpan'}
           </button>
         </footer>
       </form>
