@@ -11,6 +11,8 @@
   transition: box-shadow 0.2s var(--paf-ease), background-color 0.2s var(--paf-ease), transform 0.2s var(--paf-ease);
 }
 @keyframes paf-in { from { opacity: 0; transform: translateY(6px); } }
+/* Kartu menerima fokus dari skrip (tabindex -1) agar pembaca layar tidak kehilangan posisi; tanpa cincin fokus. */
+.paf:focus { outline: none; }
 
 .paf-icon {
   width: 40px; height: 40px; border-radius: 11px; flex: none; display: grid; place-items: center; color: #fff;

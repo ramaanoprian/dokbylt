@@ -1,11 +1,15 @@
 // Tombol "Isi dari PDF / foto surat" di form Surat Masuk dan Surat Keluar. Bagian ini sengaja kecil:
 // pembaca PDF, OCR, dan langkah tinjau baru dimuat saat berkas dipilih.
-import { lazy, Suspense, useRef, useState } from 'react';
-import { Camera, Check, FileUp, ScanText, TriangleAlert } from 'lucide-react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Camera, Check, FileUp, Paperclip, ScanText, TriangleAlert } from 'lucide-react';
+import type { Attachment } from '../backend';
 import type { ModuleDef } from '../modules';
 import './pdfAutofill.css';
 
 const Panel = lazy(() => import('./Panel'));
+
+/** Unggahan berkas surat: data lampirannya, atau pesan galat. */
+export type ScanUpload = Promise<Attachment | string>;
 
 export interface AutofillProps {
   mod: ModuleDef;
@@ -14,8 +18,12 @@ export interface AutofillProps {
   /** Nilai bawaan form baru (tanggal hari ini); boleh diganti seperti isian kosong. */
   defaults: Record<string, string>;
   onApply: (patch: Record<string, string>) => void;
-  /** Lampirkan berkas ke data ini. Hasilnya null bila berhasil, atau pesan galat. */
-  attach: (file: File) => Promise<string | null>;
+  /** Unggah berkas surat ke penyimpanan, sambil dibaca. Belum masuk daftar lampiran. */
+  upload: (file: File) => ScanUpload;
+  /** Masukkan hasil unggahan ke lampiran setelah selesai. Hasilnya null bila berhasil, atau pesan galat. */
+  keep: (job: ScanUpload) => Promise<string | null>;
+  /** Buang hasil unggahan yang tidak jadi dipakai (pembacaan dibatalkan). */
+  discard: (job: ScanUpload) => void;
 }
 
 /** Menu yang punya fitur ini. */
@@ -38,6 +46,15 @@ export function PdfAutofill(props: AutofillProps) {
   const [wrong, setWrong] = useState('');
   const pickRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  const mainBtn = useRef<HTMLButtonElement>(null);
+  // Setelah langkah tinjau ditutup, fokus kembali ke tombol kartu ini bila fokusnya ikut hilang.
+  const back = useRef(false);
+  useEffect(() => {
+    if (file || !back.current) return;
+    back.current = false;
+    const a = document.activeElement;
+    if (!a || a === document.body) mainBtn.current?.focus();
+  }, [file]);
 
   const choose = (f: File | null | undefined) => {
     if (!f) return;
@@ -54,12 +71,13 @@ export function PdfAutofill(props: AutofillProps) {
           {...props}
           file={file}
           onClose={(count, info) => {
+            back.current = true;
             setFile(null);
-            if (!count) return;
-            const next: Done = { name: file.name, count, check: info?.check ?? [], att: 'busy' };
+            if (!info) return;
+            const next: Done = { name: file.name, count, check: info.check, att: 'busy' };
             setDone(next);
             // Lampiran bisa selesai setelah langkah tinjau ditutup.
-            info?.attached.then((e) => setDone((d) => (d === next ? { ...d, att: e === null ? 'ok' : 'fail' } : d)));
+            info.attached.then((e) => setDone((d) => (d === next ? { ...d, att: e === null ? 'ok' : 'fail' } : d)));
           }}
         />
       </Suspense>
@@ -67,8 +85,8 @@ export function PdfAutofill(props: AutofillProps) {
   }
 
   const what = props.mod.id === 'surat' ? 'Nomor, tanggal, pengirim, perihal, dan tujuan' : 'Nomor, tanggal, tujuan, dan perihal';
-  // Saat berkas sedang diseret, pesan seret didahulukan.
-  const view = drag ? 'drag' : done ? 'done' : wrong ? 'wrong' : 'idle';
+  // Saat berkas sedang diseret, pesan seret didahulukan. "kept": surat tak terbaca, berkasnya saja yang dilampirkan.
+  const view = drag ? 'drag' : done ? (done.count ? 'done' : 'kept') : wrong ? 'wrong' : 'idle';
   return (
     <div
       className={'paf paf-entry' + (view === 'idle' ? '' : ' paf-' + view)}
@@ -85,7 +103,15 @@ export function PdfAutofill(props: AutofillProps) {
       }}
     >
       <span className={'paf-icon' + (view === 'done' ? ' paf-ok' : view === 'wrong' ? ' paf-warn' : '')} aria-hidden="true">
-        {view === 'done' ? <Check size={18} strokeWidth={2.6} /> : view === 'wrong' ? <TriangleAlert size={18} /> : <ScanText size={19} />}
+        {view === 'done' ? (
+          <Check size={18} strokeWidth={2.6} />
+        ) : view === 'kept' ? (
+          <Paperclip size={17} />
+        ) : view === 'wrong' ? (
+          <TriangleAlert size={18} />
+        ) : (
+          <ScanText size={19} />
+        )}
       </span>
       <div className="paf-copy" aria-live="polite">
         {view === 'drag' ? (
@@ -95,10 +121,10 @@ export function PdfAutofill(props: AutofillProps) {
           </>
         ) : done ? (
           <>
-            <b>{done.count} isian terisi dari surat</b>
+            <b>{done.count ? `${done.count} isian terisi dari surat` : 'Lengkapi isian secara manual'}</b>
             <span className="paf-sub">
               {ATT[done.att]}
-              {done.check.length ? (
+              {!done.count ? null : done.check.length ? (
                 <span className="paf-recheck">Cek ulang {new Intl.ListFormat('id').format(done.check).toLowerCase()}.</span>
               ) : (
                 'Periksa lagi sebelum menyimpan.'
@@ -128,7 +154,12 @@ export function PdfAutofill(props: AutofillProps) {
         <button type="button" className="btn small paf-cam" onClick={() => camRef.current?.click()} aria-label="Foto surat">
           <Camera size={15} />
         </button>
-        <button type="button" className={done ? 'btn small' : 'pill-btn paf-pick'} onClick={() => pickRef.current?.click()}>
+        <button
+          ref={mainBtn}
+          type="button"
+          className={done ? 'btn small' : 'pill-btn paf-pick'}
+          onClick={() => pickRef.current?.click()}
+        >
           <FileUp size={15} /> {done ? 'Baca surat lain' : 'Pilih berkas'}
         </button>
       </div>

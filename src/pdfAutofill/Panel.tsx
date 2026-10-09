@@ -1,15 +1,18 @@
 // Membaca surat lalu menampilkan langkah tinjau. Dimuat terpisah (lazy) bersama pembaca PDF dan OCR.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, LoaderCircle, Paperclip, RotateCcw, ScanText, TriangleAlert, X } from 'lucide-react';
 import type { Field } from '../modules';
 import { readLetter, ReadError, type PageText, type Progress } from './extract';
 import { parseLetter, UNSURE, type Guesses, type LetterModule } from './parse';
-import type { AutofillProps } from './index';
+import type { AutofillProps, ScanUpload } from './index';
 import './panel.css';
 
 interface Props extends AutofillProps {
   file: File;
-  /** Jumlah isian yang diterapkan (0 bila dibatalkan), label isian yang masih perlu dicek, dan status lampiran. */
+  /**
+   * Jumlah isian yang diterapkan, label isian yang masih perlu dicek, dan status lampiran.
+   * Tanpa info berarti dibatalkan: form tidak berubah dan berkasnya tidak dilampirkan.
+   */
   onClose: (applied: number, info?: { check: string[]; attached: Promise<string | null> }) => void;
 }
 
@@ -24,9 +27,6 @@ type State =
   | { step: 'read'; pct: number; label: string; detail: string; note: string }
   | { step: 'review'; pages: PageText[]; rows: Record<string, Row> }
   | { step: 'error'; message: string };
-
-/** Unggahan per berkas, agar berkas yang sama tidak terlampir dua kali (mis. saat dibaca ulang). */
-const uploads = new WeakMap<File, Promise<string | null>>();
 
 const fmtSize = (b: number) => (b > 1_000_000 ? `${(b / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1000))} KB`);
 
@@ -51,7 +51,7 @@ function describe(p: Progress): [string, string] {
 const rowsFor = (v: string, max: number) =>
   Math.min(max, Math.max(1, v.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / 52)), 0)));
 
-export default function Panel({ file, mod, values, defaults, onApply, attach, onClose }: Props) {
+export default function Panel({ file, mod, values, defaults, onApply, upload, keep, discard, onClose }: Props) {
   const kind = mod.id as LetterModule;
   const fields = useMemo(
     () => KEYS[kind].map((k) => mod.fields.find((f) => f.key === k)).filter((f): f is Field => !!f),
@@ -69,21 +69,45 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
   };
   const opts = useMemo(() => ({ mod: kind, units: mod.fields.find((f) => f.key === 'tujuan')?.options ?? [] }), [kind, mod]);
 
-  const upload = (again = false) => {
-    let p = uploads.get(file);
-    if (!p || again) {
-      p = attach(file);
-      uploads.set(file, p);
-    }
+  // Berkas diunggah bersamaan dengan pembacaan, tetapi baru masuk lampiran saat diterapkan.
+  // Satu unggahan per berkas, walau efeknya dijalankan dua kali (StrictMode).
+  const job = useRef<{ file: File; p: ScanUpload } | null>(null);
+  const send = () => {
+    const p = upload(file);
+    job.current = { file, p };
     setAtt('busy');
-    p.then((e) => {
-      setAtt(e ? 'fail' : 'ok');
-      setAttErr(e ?? '');
+    p.then((a) => {
+      if (job.current?.p !== p) return;
+      setAtt(typeof a === 'string' ? 'fail' : 'ok');
+      setAttErr(typeof a === 'string' ? a : '');
     });
   };
+  useEffect(() => {
+    if (job.current?.file !== file) send();
+  }, [file]);
 
-  // Berkas langsung dilampirkan, bersamaan dengan pembacaan.
-  useEffect(upload, [file]);
+  // Batal: form tidak berubah dan unggahannya dibuang.
+  const cancel = () => {
+    if (job.current) discard(job.current.p);
+    onClose(0);
+  };
+  // Terapkan, atau lampirkan saja bila surat tak terbaca: berkasnya masuk lampiran setelah unggahan selesai.
+  const finish = (patch: Record<string, string>, check: string[]) => {
+    const n = Object.keys(patch).length;
+    if (n) onApply(patch);
+    onClose(n, { check, attached: job.current ? keep(job.current.p) : Promise.resolve('Berkas belum terunggah.') });
+  };
+
+  // Fokus pindah ke kartu yang baru tampil bila fokus sebelumnya hilang bersama kartu lama,
+  // bukan saat pengguna sedang mengisi field lain sambil menunggu.
+  const box = useRef<HTMLElement | null>(null);
+  const setBox = useCallback((el: HTMLElement | null) => {
+    box.current = el;
+  }, []);
+  useEffect(() => {
+    const a = document.activeElement;
+    if (!a || a === document.body) box.current?.focus();
+  }, [state.step]);
 
   useEffect(() => {
     const ctl = new AbortController();
@@ -131,16 +155,16 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
   const attachNote =
     att === 'busy' ? (
       <span className="paf-chip">
-        <LoaderCircle size={13} className="spin" /> Melampirkan…
+        <LoaderCircle size={13} className="spin" /> Mengunggah…
       </span>
     ) : att === 'ok' ? (
       <span className="paf-chip paf-ok">
-        <Paperclip size={13} /> Terlampir
+        <Paperclip size={13} /> Siap dilampirkan
       </span>
     ) : (
       <span className="paf-chip paf-fail">
-        <TriangleAlert size={13} /> {attErr || 'Gagal dilampirkan'}
-        <button type="button" className="link" onClick={() => upload(true)}>
+        <TriangleAlert size={13} /> {attErr || 'Gagal diunggah'}
+        <button type="button" className="link" onClick={send}>
           Coba lagi
         </button>
       </span>
@@ -148,7 +172,7 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
 
   if (state.step === 'read') {
     return (
-      <div className="paf paf-work" role="status" aria-live="polite">
+      <div ref={setBox} tabIndex={-1} className="paf paf-work" role="status" aria-live="polite">
         <span className="paf-icon paf-busy" aria-hidden="true">
           <ScanText size={19} />
         </span>
@@ -175,7 +199,7 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
           </span>
           {state.note && <span className="paf-note">{state.note}</span>}
         </div>
-        <button type="button" className="btn small paf-cancel" onClick={() => onClose(0)}>
+        <button type="button" className="btn small paf-cancel" onClick={cancel}>
           Batal
         </button>
       </div>
@@ -184,7 +208,7 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
 
   if (state.step === 'error') {
     return (
-      <div className="paf paf-error" role="alert">
+      <div ref={setBox} tabIndex={-1} className="paf paf-error" role="alert">
         <span className="paf-icon paf-warn" aria-hidden="true">
           <TriangleAlert size={18} />
         </span>
@@ -202,7 +226,12 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
           <button type="button" className="btn small" onClick={() => setRun((n) => n + 1)}>
             <RotateCcw size={14} /> Coba lagi
           </button>
-          <button type="button" className="icon-btn" onClick={() => onClose(0)} aria-label="Tutup">
+          {att !== 'fail' && (
+            <button type="button" className="btn small" onClick={() => finish({}, [])}>
+              <Paperclip size={14} /> Lampirkan saja
+            </button>
+          )}
+          <button type="button" className="icon-btn" onClick={cancel} aria-label="Tutup tanpa melampirkan">
             <X size={18} />
           </button>
         </div>
@@ -217,14 +246,20 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
   const apply = () => {
     const patch: Record<string, string> = {};
     for (const f of picked) patch[f.key] = rows[f.key].value.trim();
-    onApply(patch);
-    onClose(picked.length, { check: picked.filter((f) => rows[f.key].unsure).map((f) => f.label), attached: uploads.get(file) ?? Promise.resolve('') });
+    finish(patch, picked.filter((f) => rows[f.key].unsure).map((f) => f.label));
   };
-  // Enter di isian tinjau tidak boleh menyimpan form utama.
-  const noSubmit = (e: React.KeyboardEvent) => e.key === 'Enter' && e.preventDefault();
+  // Enter di langkah tinjau tidak boleh menyimpan form utama. Baris baru tetap boleh di isian catatan.
+  const noSubmit = (e: React.KeyboardEvent) => {
+    const t = e.target;
+    const field =
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLSelectElement ||
+      (t instanceof HTMLTextAreaElement && t.classList.contains('paf-oneline'));
+    if (e.key === 'Enter' && field) e.preventDefault();
+  };
 
   return (
-    <section className="paf paf-review" aria-label="Tinjau hasil baca surat">
+    <section ref={setBox} tabIndex={-1} className="paf paf-review" aria-label="Tinjau hasil baca surat" onKeyDown={noSubmit}>
       <header className="paf-head">
         <span className="paf-icon" aria-hidden="true">
           <ScanText size={19} />
@@ -242,7 +277,7 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
             {attachNote}
           </span>
         </div>
-        <button type="button" className="icon-btn" onClick={() => onClose(0)} aria-label="Tutup tanpa menerapkan">
+        <button type="button" className="icon-btn" onClick={cancel} aria-label="Tutup tanpa menerapkan">
           <X size={18} />
         </button>
       </header>
@@ -282,7 +317,7 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
               </div>
               <div className="paf-input">
                 {f.type === 'select' ? (
-                  <select {...common} onKeyDown={noSubmit} onChange={(e) => change(e.target.value)}>
+                  <select {...common} onChange={(e) => change(e.target.value)}>
                     <option value="">Pilih…</option>
                     {f.options!.map((o) => (
                       <option key={o}>{o}</option>
@@ -291,14 +326,13 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
                 ) : f.type === 'textarea' ? (
                   <textarea {...common} rows={Math.max(2, rowsFor(r.value, 8))} onChange={(e) => change(e.target.value)} />
                 ) : f.type === 'date' ? (
-                  <input {...common} type="date" onKeyDown={noSubmit} onChange={(e) => change(e.target.value)} />
+                  <input {...common} type="date" onChange={(e) => change(e.target.value)} />
                 ) : (
                   // Isian satu baris yang ikut melebar ke bawah agar nilai panjang terlihat utuh.
                   <textarea
                     {...common}
                     className="paf-oneline"
                     rows={rowsFor(r.value, 3)}
-                    onKeyDown={noSubmit}
                     onChange={(e) => change(e.target.value.replace(/\n/g, ' '))}
                   />
                 )}
@@ -324,7 +358,7 @@ export default function Panel({ file, mod, values, defaults, onApply, attach, on
           {picked.length ? `${picked.length} isian akan diterapkan ke form.` : 'Belum ada isian yang dicentang.'}
         </span>
         <span className="spacer" />
-        <button type="button" className="btn small" onClick={() => onClose(0)}>
+        <button type="button" className="btn small" onClick={cancel}>
           Batal
         </button>
         <button type="button" className="pill-btn" onClick={apply} disabled={!picked.length}>

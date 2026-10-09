@@ -356,6 +356,8 @@ function cleanKop(s: string) {
   const n = words.length;
   if (n > 2 && /^[\p{L}\d]$/u.test(words[n - 1]) && !/^(negeri|swasta|no|nomor|kelas|unit|cabang|ywka)$/i.test(words[n - 2]))
     words.pop();
+  // Begitu pula satu huruf/angka di awal sebelum nama ("5 SMP NEGERI …").
+  if (words.length > 2 && /^[\p{L}\d]$/u.test(words[0]) && words[1].length > 2) words.shift();
   t = words.join(' ').replace(/\b(SMP|SMA|SMK|SD|MTS)\s*(NEGERI)\b/gi, '$1 $2');
   // Nama yang terbaca dua kali (dua logo di kiri dan kanan): ambil satu.
   const ws = t.split(' ');

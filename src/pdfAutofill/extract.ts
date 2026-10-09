@@ -32,6 +32,8 @@ const MIN_LETTERS = 60;
 /** Sisi terpanjang gambar untuk OCR: setara ±300 dpi pada A4, cukup tajam dan tetap cepat. */
 const OCR_SIDE = 3300;
 
+const letterCount = (s: string) => s.match(/\p{L}/gu)?.length ?? 0;
+
 const abs = (dir: string) => new URL(import.meta.env.BASE_URL + dir, document.baseURI).href;
 
 export class ReadError extends Error {}
@@ -55,10 +57,9 @@ export async function readLetter(file: File, opt: Options): Promise<PageText[]> 
     const canvas = toCanvas(bmp.width * scale, bmp.height * scale);
     canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
     bmp.close();
-    clean(canvas);
     const ocr = await startOcr(opt, 1);
     try {
-      return [{ page: 1, text: await ocr.read(canvas, 1), source: 'ocr' }];
+      return [{ page: 1, text: await ocrPage(ocr, canvas, 1), source: 'ocr' }];
     } finally {
       ocr.stop();
     }
@@ -90,13 +91,12 @@ async function readPdf(file: File, opt: Options): Promise<PageText[]> {
       opt.onProgress({ phase: 'read', page: n, pages });
       const page = await doc.getPage(n);
       const text = await pageText(page);
-      if ((text.match(/\p{L}/gu)?.length ?? 0) >= MIN_LETTERS) {
+      if (letterCount(text) >= MIN_LETTERS) {
         out.push({ page: n, text, source: 'text' });
       } else {
         // Halaman hasil scan: gambar halaman lalu kenali teksnya.
         ocr ??= await startOcr(opt, pages);
-        const canvas = await renderPage(page);
-        out.push({ page: n, text: await ocr.read(canvas, n), source: 'ocr' });
+        out.push({ page: n, text: await ocrPage(ocr, await renderPage(page), n), source: 'ocr' });
       }
       page.cleanup();
       if (opt.signal.aborted) throw new DOMException('Dibatalkan', 'AbortError');
@@ -155,36 +155,96 @@ async function renderPage(page: PDFPageProxy): Promise<HTMLCanvasElement> {
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvas, canvasContext: ctx, viewport }).promise;
-  return clean(canvas);
+  return canvas;
+}
+
+/** Kenali teks satu halaman. Bila setelah garis dihapus nyaris tak ada huruf terbaca, gambar aslinya dibaca ulang. */
+async function ocrPage(ocr: Ocr, canvas: HTMLCanvasElement, n: number): Promise<string> {
+  const raw = clean(canvas);
+  const text = await ocr.read(canvas, n);
+  if (!raw || letterCount(text) >= MIN_LETTERS) return text;
+  const again = await ocr.read(raw, n);
+  return letterCount(again) > letterCount(text) ? again : text;
 }
 
 /**
- * Ubah ke abu-abu dan hapus garis mendatar panjang (garis bawah perihal, garis kop, tabel). Teks yang
- * digarisbawahi sering tidak terbaca OCR bila garisnya dibiarkan.
+ * Ubah ke abu-abu dan hapus garis mendatar panjang yang tipis (garis bawah perihal, garis kop, tabel). Teks yang
+ * digarisbawahi sering tidak terbaca OCR bila garisnya dibiarkan. Batas gelap mengikuti terang kertas di sekitarnya,
+ * jadi kertas pada foto redup atau berbayang tidak dianggap garis. Hasilnya salinan gambar asli bila ada garis yang
+ * dihapus, atau null bila tidak ada.
  */
-function clean(canvas: HTMLCanvasElement) {
+function clean(canvas: HTMLCanvasElement): HTMLCanvasElement | null {
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
   const { width: w, height: h } = canvas;
   const img = ctx.getImageData(0, 0, w, h);
   const px = img.data;
-  const minRun = Math.round(w * 0.045);
   const gray = new Uint8Array(w * h);
   for (let i = 0, j = 0; j < gray.length; i += 4, j++) gray[j] = (px[i] * 299 + px[i + 1] * 587 + px[i + 2] * 114) / 1000;
+
+  // Terang kertas per petak: persentil ke-90 (kertas selalu lebih banyak daripada tinta).
+  const size = Math.max(32, Math.round(Math.min(w, h) / 16));
+  const cols = Math.ceil(w / size);
+  const cells = cols * Math.ceil(h / size);
+  const colOf = new Uint16Array(w);
+  for (let x = 0; x < w; x++) colOf[x] = Math.floor(x / size);
+  const hist = new Uint32Array(cells * 256);
+  for (let y = 0; y < h; y++) {
+    const base = Math.floor(y / size) * cols;
+    for (let x = 0, j = y * w; x < w; x++, j++) hist[(base + colOf[x]) * 256 + gray[j]]++;
+  }
+  const paper = new Uint8Array(cells);
+  for (let c = 0; c < cells; c++) {
+    let total = 0;
+    for (let g = 0; g < 256; g++) total += hist[c * 256 + g];
+    let seen = 0;
+    let g = 0;
+    while (g < 255 && (seen += hist[c * 256 + g]) < total * 0.9) g++;
+    paper[c] = g;
+  }
+
+  // Tinggi kolom gelap tempat tiap piksel berada (maks. 255): garis tipis, huruf dan bidang gelap tinggi.
+  const tall = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const base = Math.floor(y / size) * cols;
+    for (let x = 0, j = y * w; x < w; x++, j++) {
+      if (gray[j] < paper[base + colOf[x]] * 0.6) tall[j] = y ? Math.min(255, tall[j - w] + 1) : 1;
+    }
+  }
+  for (let j = w * (h - 1) - 1; j >= 0; j--) if (tall[j] && tall[j + w]) tall[j] = tall[j + w];
+
+  // Hapus potongan mendatar yang panjang dan sebagian besar tipis; goresan huruf yang menempel tetap utuh.
+  const minRun = Math.round(w * 0.045);
+  const thin = Math.max(3, Math.round(h * 0.005));
+  let erased = 0;
   for (let y = 0; y < h; y++) {
     const row = y * w;
+    const base = Math.floor(y / size) * cols;
     let start = -1;
     for (let x = 0; x <= w; x++) {
-      const dark = x < w && gray[row + x] < 150;
+      const dark = x < w && tall[row + x] > 0;
       if (dark && start < 0) start = x;
       else if (!dark && start >= 0) {
-        if (x - start >= minRun) gray.fill(255, row + start, row + x);
+        if (x - start >= minRun) {
+          let n = 0;
+          for (let i = start; i < x; i++) if (tall[row + i] <= thin) n++;
+          if (n >= (x - start) * 0.6) {
+            for (let i = start; i < x; i++) if (tall[row + i] <= thin) gray[row + i] = paper[base + colOf[i]];
+            erased++;
+          }
+        }
         start = -1;
       }
     }
   }
+
+  let raw: HTMLCanvasElement | null = null;
+  if (erased) {
+    raw = toCanvas(w, h);
+    raw.getContext('2d')!.drawImage(canvas, 0, 0);
+  }
   for (let i = 0, j = 0; j < gray.length; i += 4, j++) px[i] = px[i + 1] = px[i + 2] = gray[j];
   ctx.putImageData(img, 0, 0);
-  return canvas;
+  return raw;
 }
 
 function toCanvas(w: number, h: number) {

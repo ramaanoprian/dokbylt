@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, MessageCircle, Printer, X } from 'lucide-react';
 import { OTHER, firstStatus, otherKey, type ModuleDef } from './modules';
 import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
@@ -7,7 +7,7 @@ import { Icon } from './icons';
 import { stageClass } from './stats';
 import { Attachments, uploadAttachment, type FileApi } from './Attachments';
 import { printDisposition, printReceipt } from './print';
-import { PdfAutofill, canAutofill } from './pdfAutofill';
+import { PdfAutofill, canAutofill, type ScanUpload } from './pdfAutofill';
 
 interface Props {
   mod: ModuleDef;
@@ -118,12 +118,46 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
     const t = setTimeout(() => setFilled([]), 1800);
     return () => clearTimeout(t);
   }, [filled]);
-  // Berkas suratnya dilampirkan seperti lewat tombol lampiran.
-  const attachScan = async (file: File) => {
-    const a = await uploadAttachment(file, `${mod.id}/${id}`, userName, files);
-    if (!a || typeof a === 'string') return a ?? 'Gagal dilampirkan';
-    setValues((v) => ({ ...v, lampiran: JSON.stringify([...attachmentsOf(v), a]) }));
-    return null;
+
+  // Unggahan lampiran yang belum selesai menahan Simpan, agar berkasnya tidak tertinggal.
+  const [scanBusy, setScanBusy] = useState(0);
+  const [attBusy, setAttBusy] = useState(false);
+  const waiting = scanBusy > 0 || attBusy;
+  // Isian terbaru, untuk dibaca setelah unggahan selesai.
+  const latest = useRef(values);
+  latest.current = values;
+  const folder = `${mod.id}/${id}`;
+  // Berkas surat diunggah sambil dibaca, tetapi baru masuk lampiran setelah isiannya diterapkan.
+  const uploadScan = (file: File): ScanUpload =>
+    uploadAttachment(file, folder, userName, files).then(
+      (a) => a ?? 'Berkas gagal diunggah.',
+      () => 'Berkas gagal diunggah.',
+    );
+  const keepScan = async (job: ScanUpload) => {
+    setScanBusy((n) => n + 1);
+    try {
+      const a = await job;
+      if (typeof a === 'string') return a;
+      // Berkas yang sama (nama dan ukuran) tidak dilampirkan dua kali; unggahan kembarnya dibuang.
+      const twin = attachmentsOf(latest.current).find((x) => x.path === a.path || (x.name === a.name && x.size === a.size));
+      if (twin) {
+        if (twin.path !== a.path) files.remove(a.path);
+        return null;
+      }
+      setValues((v) => {
+        const cur = attachmentsOf(v);
+        return cur.some((x) => x.path === a.path) ? v : { ...v, lampiran: JSON.stringify([...cur, a]) };
+      });
+      return null;
+    } finally {
+      setScanBusy((n) => n - 1);
+    }
+  };
+  // Pembacaan dibatalkan: unggahannya dihapus lagi dari penyimpanan.
+  const discardScan = (job: ScanUpload) => {
+    job.then((a) => {
+      if (typeof a !== 'string') files.remove(a.path);
+    });
   };
 
   useEffect(() => {
@@ -134,7 +168,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (blocked) return;
+    if (blocked || waiting) return;
     // Buang keterangan "Lainnya" yang tidak lagi dipakai.
     const clean = { ...values };
     for (const f of mod.fields) if (clean[f.key] !== OTHER) delete clean[otherKey(f.key)];
@@ -200,7 +234,15 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
 
         <div className="sheet-body">
           {canAutofill(mod) && (
-            <PdfAutofill mod={mod} values={values} defaults={defaults} onApply={applyScan} attach={attachScan} />
+            <PdfAutofill
+              mod={mod}
+              values={values}
+              defaults={defaults}
+              onApply={applyScan}
+              upload={uploadScan}
+              keep={keepScan}
+              discard={discardScan}
+            />
           )}
           <fieldset className="stepper">
             <legend>Tahap</legend>
@@ -347,11 +389,12 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
           )}
 
           <Attachments
-            folder={`${mod.id}/${id}`}
+            folder={folder}
             items={attachmentsOf(values)}
             userName={userName}
             files={files}
-            onChange={(list) => set('lampiran', JSON.stringify(list))}
+            onChange={(update) => setValues((v) => ({ ...v, lampiran: JSON.stringify(update(attachmentsOf(v))) }))}
+            onBusy={setAttBusy}
           />
 
 
@@ -409,8 +452,8 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
           <button type="button" className="btn" onClick={onClose}>
             Batal
           </button>
-          <button type="submit" className="pill-btn big" disabled={blocked}>
-            Simpan
+          <button type="submit" className="pill-btn big" disabled={blocked || waiting}>
+            {waiting ? 'Menunggu lampiran…' : 'Simpan'}
           </button>
         </footer>
       </form>
