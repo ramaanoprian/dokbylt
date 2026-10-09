@@ -9,7 +9,7 @@
 .paf .paf-cancel { flex: none; background: var(--surface); box-shadow: inset 0 0 0 1px var(--paf-line); }
 
 /* Status lampiran */
-.paf-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 7px; border-radius: 980px; background: var(--fill-2); color: var(--muted); font-size: 0.75rem; font-weight: 500; white-space: nowrap; }
+.paf-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 7px; border-radius: var(--r-pill); background: var(--fill-2); color: var(--muted); font-size: 0.75rem; font-weight: 500; white-space: nowrap; }
 .paf-chip.paf-ok { background: var(--ok-soft); color: var(--ok); }
 .paf-chip.paf-fail { background: var(--danger-soft); color: var(--danger); white-space: normal; }
 .paf-chip .link { font-size: inherit; margin-left: 4px; }
@@ -28,7 +28,7 @@
 .paf-rows li {
   display: grid; grid-template-columns: 28px minmax(120px, 0.34fr) minmax(0, 1fr); align-items: start; gap: 4px 12px;
   padding: 8px 16px; transition: background-color 0.18s var(--paf-ease);
-  animation: paf-row 0.28s var(--paf-ease) both; animation-delay: calc(var(--i, 0) * 28ms);
+  animation: paf-row var(--dur-3) var(--ease-emph) both; animation-delay: calc(var(--i, 0) * 28ms);
 }
 @keyframes paf-row { from { opacity: 0; transform: translateY(4px); } }
 .paf-rows li + li { border-top: 1px solid var(--hair); }
@@ -51,7 +51,7 @@
 
 .paf-label { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; padding-top: 10px; }
 .paf-label label { font-size: 0.875rem; font-weight: 500; color: var(--text-2); line-height: 1.3; cursor: pointer; }
-.paf-flag { padding: 1px 8px; border-radius: 980px; background: var(--warn-soft); color: var(--warn); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.01em; }
+.paf-flag { padding: 1px 8px; border-radius: var(--r-pill); background: var(--warn-soft); color: var(--warn); font-size: 0.7rem; font-weight: 600; letter-spacing: 0.01em; }
 .paf-now { max-width: 100%; font-size: 0.75rem; color: var(--muted); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
 .paf-input input, .paf-input select, .paf-input textarea {
@@ -72,7 +72,7 @@
 .paf-raw[open] summary svg { transform: rotate(180deg); }
 .paf-raw pre {
   margin: 0 0 14px; max-height: 260px; overflow: auto; padding: 12px 14px; border-radius: 12px; background: var(--fill-2); color: var(--text-2);
-  font: 0.75rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 0.75rem/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere;
   animation: paf-in 0.22s var(--paf-ease) both;
 }
 
@@ -80,7 +80,7 @@
 .paf-foot .pill-btn { min-height: 34px; padding: 6px 18px; font-size: 0.875rem; }
 
 /* Field form yang baru terisi dari surat berpendar sebentar. */
-.record-form .form-grid label.autofilled :is(input, select, textarea) { animation: paf-glow 1.6s var(--ease, ease) both; }
+.record-form .form-grid label.autofilled :is(input, select, textarea) { animation: paf-glow 1.6s var(--ease-standard) both; }
 @keyframes paf-glow {
   0%, 30% { background-color: color-mix(in srgb, var(--accent, var(--blue)) 12%, var(--surface)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent, var(--blue)) 22%, transparent); }
 }

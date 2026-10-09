@@ -311,7 +311,7 @@ export function ModulePage({
     const on = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (editing || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return;
-      if (document.querySelector('.overlay, .palette-overlay')) return;
+      if (document.querySelector('.overlay:not(.is-leaving), .palette-overlay:not(.is-leaving)')) return;
       if (e.key === 'n' || e.key === 'N') {
         e.preventDefault();
         setEditing({});

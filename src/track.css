@@ -1,7 +1,8 @@
 /* Halaman lacak publik (#lacak) dan kode lacak di formulir pendaftaran.
    Kartu putih yang tenang, gerak singkat dan halus, warna tahap sama dengan dashboard. */
 
-.lk { --lk-ease: cubic-bezier(0.2, 0.8, 0.2, 1); --lk-w: 720px; --lk-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace; }
+/* Kurva, huruf mono, sudut, dan bayangan memakai token di styles.css. */
+.lk { --lk-ease: var(--ease-standard); --lk-w: 720px; --lk-mono: var(--mono); }
 .lk .public-head { max-width: var(--lk-w); }
 .lk-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .lk-mono { font-family: var(--lk-mono, ui-monospace, Menlo, Consolas, monospace); letter-spacing: 0.04em; }
@@ -10,13 +11,13 @@
 
 .lk-stack { width: 100%; max-width: var(--lk-w); margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 .lk-card {
-  background: var(--surface); border-radius: 22px; box-shadow: var(--card-shadow); padding: 32px; min-width: 0;
-  animation: lk-in 0.28s var(--lk-ease) both;
+  background: var(--surface); border-radius: var(--r-xl); box-shadow: var(--e1); padding: var(--sp-8); min-width: 0;
+  animation: lk-in var(--dur-4) var(--ease-emph) both;
 }
 .lk-stack > :nth-child(2) { animation-delay: 40ms; }
 .lk-stack > :nth-child(3) { animation-delay: 80ms; }
 .lk-stack > :nth-child(n + 4) { animation-delay: 120ms; }
-.lk-bar, .lk-actions, .lk-privacy { animation: lk-fade 0.24s var(--lk-ease) both; }
+.lk-bar, .lk-actions, .lk-privacy { animation: lk-fade var(--dur-3) var(--lk-ease) both; }
 @keyframes lk-in { from { opacity: 0; transform: translateY(8px); } }
 @keyframes lk-fade { from { opacity: 0; } }
 
@@ -45,23 +46,23 @@
 .lk-input {
   height: 52px; border-radius: 14px; padding: 0 58px 0 18px; background: var(--fill-2); border-color: transparent;
   font: 600 1.2rem/1 var(--lk-mono); letter-spacing: 0.12em; text-transform: uppercase;
-  transition: background 0.2s var(--lk-ease), border-color 0.2s var(--lk-ease), box-shadow 0.2s var(--lk-ease);
+  transition: background var(--dur-2) var(--lk-ease), border-color var(--dur-2) var(--lk-ease), box-shadow var(--dur-2) var(--lk-ease);
 }
 .lk-input::placeholder {
-  font-family: -apple-system, BlinkMacSystemFont, 'Inter Variable', 'Helvetica Neue', sans-serif; font-size: 1rem; font-weight: 400;
+  font-family: var(--font); font-size: 1rem; font-weight: 400;
   letter-spacing: -0.01em; text-transform: none;
 }
 .lk-input:focus { background: var(--surface); }
 .lk-input[aria-invalid='true'] { border-color: var(--danger); box-shadow: 0 0 0 4px var(--danger-soft); }
 .lk-count {
   position: absolute; right: 16px; top: 50%; transform: translateY(-50%); pointer-events: none;
-  font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; transition: color 0.2s var(--lk-ease);
+  font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; transition: color var(--dur-2) var(--lk-ease);
 }
 .lk-count.full { color: var(--ok); display: grid; }
 .lk-go { min-height: 52px !important; padding: 0 24px !important; flex: none; gap: 8px !important; }
-.lk-go svg { transition: transform 0.2s var(--lk-ease); }
+.lk-go svg { transition: transform var(--dur-2) var(--lk-ease); }
 .lk-go:hover:not(:disabled) svg { transform: translateX(2px); }
-.lk-help { font-size: 0.84rem; color: var(--muted); min-height: 1.3em; margin-top: 2px; transition: color 0.2s var(--lk-ease); }
+.lk-help { font-size: 0.84rem; color: var(--muted); min-height: 1.3em; margin-top: 2px; transition: color var(--dur-2) var(--lk-ease); }
 .lk-help.error { color: var(--danger); }
 
 .lk-recent { width: 100%; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--hair); text-align: left; }
@@ -70,7 +71,7 @@
 .lk-recent ul { list-style: none; margin: 0 -10px; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .lk-recent-row {
   display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 12px; color: var(--text); text-decoration: none;
-  transition: background 0.18s var(--lk-ease);
+  transition: background var(--dur-2) var(--lk-ease);
 }
 .lk-recent-row:hover { background: var(--fill-2); }
 .lk-recent-row b { font-weight: 500; font-size: 0.94rem; }
@@ -83,18 +84,18 @@
 /* ---------- Bilah atas hasil ---------- */
 .lk-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; }
 .lk-back {
-  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 8px; margin-left: -8px; border-radius: 980px;
-  color: var(--link); text-decoration: none; font-size: 0.94rem; transition: background 0.18s var(--lk-ease);
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 8px; margin-left: -8px; border-radius: var(--r-pill);
+  color: var(--link); text-decoration: none; font-size: 0.94rem; transition: background var(--dur-2) var(--lk-ease);
 }
 .lk-back:hover { background: var(--blue-soft); }
-.lk-back svg { transition: transform 0.2s var(--lk-ease); }
+.lk-back svg { transition: transform var(--dur-2) var(--lk-ease); }
 .lk-back:hover svg { transform: translateX(-2px); }
 .lk-code {
   display: inline-flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 12px 4px 14px; border: 0; cursor: pointer;
-  border-radius: 980px; background: var(--surface); box-shadow: var(--card-shadow); color: var(--muted); font-size: 0.78rem;
-  transition: box-shadow 0.2s var(--lk-ease), transform 0.2s var(--lk-ease);
+  border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--e1); color: var(--muted); font-size: var(--fs-xs);
+  transition: box-shadow var(--dur-2) var(--lk-ease), transform var(--dur-2) var(--lk-ease);
 }
-.lk-code:hover { box-shadow: var(--card-shadow-hover); }
+.lk-code:hover { box-shadow: var(--e2); }
 .lk-code:active { transform: scale(0.98); }
 .lk-code b { font: 600 0.9rem/1 var(--lk-mono, ui-monospace, Menlo, Consolas, monospace); letter-spacing: 0.08em; color: var(--text); }
 .lk-code svg { color: var(--muted); }
@@ -112,7 +113,7 @@
   --c: var(--s2); margin-top: 24px; padding: 20px 22px; border-radius: 18px; display: flex; gap: 16px; align-items: flex-start;
   background: color-mix(in srgb, var(--c) 8%, var(--surface));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 24%, transparent);
-  animation: lk-in 0.28s var(--lk-ease) 0.06s both;
+  animation: lk-in var(--dur-4) var(--ease-emph) 0.06s both;
 }
 .lk-status-icon { position: relative; width: 42px; height: 42px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; background: var(--c); }
 /* Denyut pelan: dokumen sedang diproses. */
@@ -126,7 +127,7 @@
 .lk-status p { color: var(--text-2); font-size: 0.97rem; line-height: 1.45; text-wrap: pretty; }
 .lk-facts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .lk-fact {
-  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 980px; font-size: 0.8rem; line-height: 1.3;
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: var(--r-pill); font-size: 0.8rem; line-height: 1.3;
   background: var(--surface); color: var(--text-2); box-shadow: 0 0 0 1px var(--hair);
 }
 .lk-fact svg { color: var(--muted); }
@@ -140,18 +141,18 @@
   content: ''; position: absolute; top: 15px; height: 3px; border-radius: 2px;
   left: calc(50% / var(--n)); right: calc(50% / var(--n)); background: var(--fill);
 }
-.lk-steps::after { background: var(--s-done); transform-origin: left center; transform: scaleX(var(--p)); animation: lk-fill 0.28s var(--lk-ease) 0.12s both; }
+.lk-steps::after { background: var(--s-done); transform-origin: left center; transform: scaleX(var(--p)); animation: lk-fill var(--dur-4) var(--ease-emph) 0.16s both; }
 @keyframes lk-fill { from { transform: scaleX(0); } }
 .lk-steps li { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 0 4px; text-align: center; font-size: 0.8rem; line-height: 1.3; color: var(--muted); }
 .lk-dot {
   width: 33px; height: 33px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 0.8rem; font-weight: 600;
   background: var(--surface); color: var(--muted); box-shadow: inset 0 0 0 2px var(--fill);
-  transition: background 0.24s var(--lk-ease), box-shadow 0.24s var(--lk-ease), color 0.24s var(--lk-ease);
+  transition: background var(--dur-2) var(--lk-ease), box-shadow var(--dur-2) var(--lk-ease), color var(--dur-2) var(--lk-ease);
 }
 .lk-steps li.past { color: var(--text-2); }
 .lk-steps li.past .lk-dot { background: var(--s-done); color: #fff; box-shadow: none; }
 .lk-steps li.on { color: var(--text); font-weight: 600; }
-.lk-steps li.on .lk-dot { background: var(--c); color: #fff; box-shadow: 0 0 0 5px color-mix(in srgb, var(--c) 20%, transparent); animation: lk-pop 0.28s var(--lk-ease) 0.2s both; }
+.lk-steps li.on .lk-dot { background: var(--c); color: #fff; box-shadow: 0 0 0 5px color-mix(in srgb, var(--c) 20%, transparent); animation: lk-pop var(--dur-3) var(--ease-emph) 0.24s both; }
 @keyframes lk-pop { from { transform: scale(0.8); } }
 .lk-step-label { display: flex; flex-direction: column; align-items: center; gap: 3px; overflow-wrap: anywhere; }
 .lk-now { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: color-mix(in srgb, var(--c) 75%, var(--text)); }
@@ -174,8 +175,8 @@
 
 /* Tombol di bawah */
 .lk-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; padding: 0 2px; }
-.lk-actions .btn { background: var(--surface); box-shadow: var(--card-shadow); transition: box-shadow 0.2s var(--lk-ease), background 0.2s var(--lk-ease); }
-.lk-actions .btn:hover:not(:disabled) { background: var(--surface); box-shadow: var(--card-shadow-hover); }
+.lk-actions .btn { background: var(--surface); box-shadow: var(--e1); transition: box-shadow var(--dur-2) var(--lk-ease), background var(--dur-2) var(--lk-ease); }
+.lk-actions .btn:hover:not(:disabled) { background: var(--surface); box-shadow: var(--e2); }
 .lk-updated { font-size: 0.8rem; color: var(--muted); }
 .lk-updated.error { color: var(--danger); }
 .lk-privacy { display: flex; align-items: flex-start; gap: 8px; padding: 0 4px; font-size: 0.8rem; line-height: 1.45; color: var(--muted); }
@@ -187,7 +188,7 @@
 .lk-list { list-style: none; margin: 20px -12px 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .lk-row {
   display: flex; align-items: center; gap: 14px; padding: 12px; border-radius: 14px; color: var(--text); text-decoration: none;
-  transition: background 0.18s var(--lk-ease);
+  transition: background var(--dur-2) var(--lk-ease);
 }
 .lk-row:hover { background: var(--fill-2); }
 .lk-row .app-icon.sm { width: 32px; height: 32px; border-radius: 9px; }
@@ -195,9 +196,9 @@
 .lk-row-main b { font-weight: 600; }
 .lk-row-meta { display: block; font-size: 0.8rem; color: var(--muted); margin-top: 1px; }
 .lk-mini { display: block; max-width: 240px; height: 4px; margin-top: 8px; border-radius: 2px; background: var(--fill); overflow: hidden; }
-.lk-mini i { display: block; height: 100%; border-radius: inherit; background: var(--c); transform-origin: left center; transform: scaleX(var(--p)); animation: lk-fill 0.28s var(--lk-ease) 0.12s both; }
+.lk-mini i { display: block; height: 100%; border-radius: inherit; background: var(--c); transform-origin: left center; transform: scaleX(var(--p)); animation: lk-fill var(--dur-4) var(--ease-emph) 0.16s both; }
 .lk-row .pill { flex: none; }
-.lk-chev { color: var(--muted); opacity: 0.7; flex: none; transition: transform 0.2s var(--lk-ease); }
+.lk-chev { color: var(--muted); opacity: 0.7; flex: none; transition: transform var(--dur-2) var(--lk-ease); }
 .lk-row:hover .lk-chev { transform: translateX(2px); }
 .lk-missing { margin: 16px 0 0; }
 
@@ -211,15 +212,19 @@
 /* ---------- Memuat ---------- */
 .lk-skel i, .lk-skel-line {
   display: block; height: 14px; margin-top: 12px; border-radius: 7px;
-  background: linear-gradient(90deg, var(--fill-2) 0%, var(--fill) 50%, var(--fill-2) 100%); background-size: 200% 100%;
-  animation: lk-shimmer 1.3s linear infinite;
+  position: relative; overflow: hidden; background: var(--fill-2);
+}
+/* Kilau bergeser lewat transform (sama dengan .sk di styles.css). */
+.lk-skel i::after, .lk-skel-line::after {
+  content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--shimmer), transparent); animation: lk-shimmer 1.4s var(--ease-standard) infinite;
 }
 .lk-skel-line { margin: 0; height: 18px; }
 .lk-skel i:first-child { margin-top: 0; }
 .lk-skel i.h { height: 30px; margin-top: 20px; border-radius: 9px; }
 .lk-skel i.box { height: 110px; margin-top: 26px; border-radius: 18px; }
 .lk-skel i.steps { height: 34px; margin-top: 26px; border-radius: 17px; }
-@keyframes lk-shimmer { to { background-position: -200% 0; } }
+@keyframes lk-shimmer { to { transform: translateX(100%); } }
 
 /* ---------- Kode lacak di formulir pendaftaran TTD EVP ---------- */
 .lk-doc-list { gap: 14px; }
@@ -228,11 +233,11 @@
 .lk-doc-code .link { text-decoration: none; font-size: 0.875rem; }
 .lk-doc-code .link:hover { text-decoration: underline; }
 .lk-doc-code .lk-code:hover { background: var(--fill); box-shadow: none; }
-.lk-doc-code b, .public .lk-code b { font-family: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace; }
+.lk-doc-code b, .public .lk-code b { font-family: var(--mono); }
 .lk-doc-track {
   width: 100%; display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 16px;
   background: color-mix(in srgb, var(--accent) 7%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
-  animation: lk-in 0.28s var(--lk-ease) 0.1s both;
+  animation: lk-in var(--dur-4) var(--ease-emph) 0.1s both;
 }
 .lk-doc-track > svg { color: var(--accent); }
 .lk-doc-track .pill-btn { text-decoration: none; flex: none; }

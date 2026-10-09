@@ -8,6 +8,9 @@ import { TrackPublic, isTrackRoute } from './TrackPublic';
 import { ToastProvider } from './toast';
 import '@fontsource-variable/inter';
 import './styles.css';
+import { startMotion } from './motion';
+
+startMotion();
 
 /** Halaman yang dibuka sesuai alamat: formulir dan halaman lacak publik dibuka unit (dan kurir) tanpa login. */
 const pageOf = () =>

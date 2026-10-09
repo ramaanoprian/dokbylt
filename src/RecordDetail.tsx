@@ -109,7 +109,7 @@ export function RecordDetail({ mod, record: r, gone, position, onPrev, onNext, o
       if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement;
       if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable) return;
-      if (document.querySelector('.overlay, .palette-overlay')) return;
+      if (document.querySelector('.overlay:not(.is-leaving), .palette-overlay:not(.is-leaving)')) return;
       const k = e.key.toLowerCase();
       if (k === 'escape') {
         e.preventDefault();

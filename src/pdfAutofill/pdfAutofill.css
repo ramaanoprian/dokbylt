@@ -2,13 +2,13 @@
    Gaya proses baca, galat, dan langkah tinjau ada di panel.css, yang baru dimuat bersama Panel. */
 
 .paf {
-  --paf-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --paf-ease: var(--ease-standard);
   --paf-tint: color-mix(in srgb, var(--accent, var(--blue)) 7%, var(--surface));
   --paf-line: color-mix(in srgb, var(--accent, var(--blue)) 22%, var(--hair));
   position: relative; display: flex; align-items: center; gap: 14px; margin: 0 0 24px; padding: 14px 14px 14px 16px;
-  border-radius: 16px; background: var(--paf-tint); box-shadow: inset 0 0 0 1px var(--paf-line);
-  animation: paf-in 0.26s var(--paf-ease) both;
-  transition: box-shadow 0.2s var(--paf-ease), background-color 0.2s var(--paf-ease), transform 0.2s var(--paf-ease);
+  border-radius: var(--r-md); background: var(--paf-tint); box-shadow: inset 0 0 0 1px var(--paf-line);
+  animation: paf-in var(--dur-3) var(--ease-emph) both;
+  transition: box-shadow var(--dur-2) var(--paf-ease), background-color var(--dur-2) var(--paf-ease), transform var(--dur-2) var(--paf-ease);
 }
 @keyframes paf-in { from { opacity: 0; transform: translateY(6px); } }
 /* Kartu menerima fokus dari skrip (tabindex -1) agar pembaca layar tidak kehilangan posisi; tanpa cincin fokus. */

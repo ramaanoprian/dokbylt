@@ -307,7 +307,7 @@ export function Overview({ data, activity, loading, go, onReport }: Props) {
             </button>
           </div>
 
-          <div className="card pad" data-mod="evp">
+          <div className="card pad span-2" data-mod="evp">
             <div className="card-head">
               <div>
                 <h3>TTD EVP per unit</h3>
@@ -356,7 +356,7 @@ export function Overview({ data, activity, loading, go, onReport }: Props) {
             )}
           </div>
 
-          <div className="card pad span-2">
+          <div className="card pad">
             <div className="card-head">
               <div>
                 <h3>Jenis dokumen TTD EVP</h3>

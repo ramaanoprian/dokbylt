@@ -16,6 +16,7 @@ import { collectReminders } from './reminders';
 import { useToast } from './toast';
 import { exportJson, isDone, readPref, writePref } from './util';
 import { ReportLoader } from './report/LazyReport';
+import { withTransition } from './motion';
 
 type Page = 'ringkasan' | 'aktivitas' | ModuleId;
 
@@ -58,11 +59,15 @@ export default function App() {
     document.documentElement.classList.toggle('lock', navOpen);
   }, [navOpen]);
 
+  // Ganti tema dengan sapuan pudar singkat (View Transitions), tanpa animasi di browser lama.
   const toggleTheme = useCallback(() => {
-    setDark((d) => {
-      writePref('theme', d ? 'light' : 'dark');
-      return !d;
-    });
+    withTransition('theme', () =>
+      setDark((d) => {
+        writePref('theme', d ? 'light' : 'dark');
+        document.documentElement.dataset.theme = d ? 'light' : 'dark';
+        return !d;
+      }),
+    );
   }, []);
 
   // Ctrl/Cmd+K atau "/" membuka pencarian cepat.
@@ -80,11 +85,13 @@ export default function App() {
   }, []);
 
   const go = useCallback((p: Page, id?: string) => {
-    location.hash = p === 'ringkasan' ? '' : p;
-    setPage(p);
-    setOpenId(id);
-    setNavOpen(false);
-    scrollTo(0, 0);
+    withTransition('nav', () => {
+      location.hash = p === 'ringkasan' ? '' : p;
+      setPage(p);
+      setOpenId(id);
+      setNavOpen(false);
+      scrollTo(0, 0);
+    });
   }, []);
   const clearOpen = useCallback(() => setOpenId(undefined), []);
   const closeStaff = useCallback(() => setStaffOpen(false), []);
