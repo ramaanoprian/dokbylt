@@ -14,7 +14,7 @@ import {
   Printer,
   X,
 } from 'lucide-react';
-import type { Field, ModuleDef } from './modules';
+import { fieldShown, stagesOf, viaDisposition, type Field, type ModuleDef } from './modules';
 import { attachmentsOf, type Attachment, type DocRecord } from './backend';
 import type { FileApi } from './Attachments';
 import { Icon } from './icons';
@@ -186,14 +186,16 @@ export function RecordDetail({ mod, record: r, gone, position, onPrev, onNext, o
     } else el.style.transform = '';
   };
 
-  const idx = mod.statuses.indexOf(r.status);
+  // Urutan tahap data ini: surat untuk unit kerja tidak melalui disposisi EVP.
+  const path = stagesOf(mod, r.values, r.status);
+  const idx = path.indexOf(r.status);
   const done = isDone(mod, r);
   const next = nextStatus(mod, r);
   const need = next ? missingFor(mod, r, next) : [];
   const due = deadlineOf(mod, r);
   const dueDays = due ? daysUntil(due) : undefined;
   const age = daysSince(lastMove(r));
-  const filled = mod.fields.filter((f) => valueOf(f, r.values));
+  const filled = mod.fields.filter((f) => fieldShown(mod, f, r.values, r.status) && valueOf(f, r.values));
   const atts = attachmentsOf(r.values);
   const title = titleOf(mod, r);
   const history = r.history.map((h, i) => ({ ...h, until: r.history[i + 1]?.at }));
@@ -275,8 +277,8 @@ export function RecordDetail({ mod, record: r, gone, position, onPrev, onNext, o
               )}
             </div>
 
-            <ol className="ux-steps" aria-label={`Tahap ${idx + 1} dari ${mod.statuses.length}`}>
-              {mod.statuses.map((s, i) => (
+            <ol className="ux-steps" aria-label={`Tahap ${idx + 1} dari ${path.length}`}>
+              {path.map((s, i) => (
                 <li
                   key={s}
                   className={(i < idx ? 'past ' : i === idx ? 'on ' : '') + stageClass(mod, s)}
@@ -427,7 +429,7 @@ export function RecordDetail({ mod, record: r, gone, position, onPrev, onNext, o
             <Printer size={15} /> <span className="hide-sm">Cetak tanda terima</span>
             <span className="only-mobile-inline">Tanda terima</span>
           </button>
-          {mod.id === 'surat' && (
+          {viaDisposition(mod, r.values, r.status) && (
             <button type="button" className="btn ghost" onClick={() => printDisposition(mod, r)} title="Cetak lembar disposisi">
               <Printer size={15} /> <span className="hide-sm">Cetak disposisi</span>
               <span className="only-mobile-inline">Disposisi</span>

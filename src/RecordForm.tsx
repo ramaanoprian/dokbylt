@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, MessageCircle, Printer, X } from 'lucide-react';
-import { OTHER, firstStatus, otherKey, stageNeeds, type ModuleDef } from './modules';
+import { OTHER, fieldShown, firstStatus, otherKey, stageNeeds, stagesOf, viaDisposition, type ModuleDef } from './modules';
 import { attachmentsOf, newId, type DocRecord, type HistoryEntry } from './backend';
 import { trackCode } from './track';
 import { daysUntil, defaultDue, notifyUrl, dueLabel, dueTone, emailOf, fmtDateTime, quoteList, resiMessage, today, waNumber } from './util';
@@ -42,7 +42,9 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
   const [dueAuto, setDueAuto] = useState(() => !record || (!record.values.tenggat && !!mod.dueDays));
   const [status, setStatus] = useState(targetStatus ?? record?.status ?? firstStatus(mod));
 
-  const needed = new Set([...mod.fields.filter((f) => f.required).map((f) => f.key), ...stageNeeds(mod, status, record)]);
+  // Urutan tahap mengikuti isian: surat untuk unit kerja tidak melalui disposisi EVP.
+  const path = stagesOf(mod, values, status, record?.status);
+  const needed = new Set([...mod.fields.filter((f) => f.required).map((f) => f.key), ...stageNeeds(mod, status, record, values)]);
   const missing = mod.fields.filter((f) => needed.has(f.key) && !values[f.key]?.trim());
   const otherMissing = mod.fields.filter((f) => values[f.key] === OTHER && !values[otherKey(f.key)]?.trim());
   const blocked = missing.length + otherMissing.length > 0;
@@ -184,6 +186,12 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
     // Buang keterangan "Lainnya" yang tidak lagi dipakai.
     const clean = { ...values };
     for (const f of mod.fields) if (clean[f.key] !== OTHER) delete clean[otherKey(f.key)];
+    // Isian tahap yang tidak dilalui (mis. disposisi pada surat yang tujuannya diganti ke unit) tidak disimpan.
+    for (const f of mod.fields) {
+      if (fieldShown(mod, f, clean, status)) continue;
+      delete clean[f.key];
+      delete clean[otherKey(f.key)];
+    }
     if (!clean.lampiran || clean.lampiran === '[]') delete clean.lampiran;
     // Hapus dari penyimpanan berkas yang dibuang dari daftar lampiran.
     const kept = new Set(attachmentsOf(clean).map((a) => a.path));
@@ -260,8 +268,8 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
           )}
           <fieldset className="stepper">
             <legend>Tahap</legend>
-            {mod.statuses.map((s, i) => {
-              const cur = mod.statuses.indexOf(status);
+            {path.map((s, i) => {
+              const cur = path.indexOf(status);
               return (
                 <label key={s} className={(status === s ? 'on ' : cur > i ? 'past ' : '') + stageClass(mod, s)}>
                   <input type="radio" name="status" value={s} checked={status === s} onChange={() => setStatus(s)} />
@@ -284,7 +292,7 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
           )}
 
           <div className="form-grid">
-            {mod.fields.map((f) => (
+            {mod.fields.filter((f) => fieldShown(mod, f, values, status)).map((f) => (
               <label
                 key={f.key}
                 data-key={f.key}
@@ -447,17 +455,12 @@ export function RecordForm({ mod, rows = [], record, userName, targetStatus, onS
               Hapus
             </button>
           )}
-          {record && (
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={() => (mod.id === 'surat' ? printDisposition(mod, current()) : printReceipt(mod, current()))}
-              title={mod.id === 'surat' ? 'Cetak lembar disposisi' : 'Cetak tanda terima'}
-            >
-              <Printer size={16} /> <span className="hide-sm">{mod.id === 'surat' ? 'Disposisi' : 'Tanda terima'}</span>
+          {record && viaDisposition(mod, values, status) && (
+            <button type="button" className="btn ghost" onClick={() => printDisposition(mod, current())} title="Cetak lembar disposisi">
+              <Printer size={16} /> <span className="hide-sm">Disposisi</span>
             </button>
           )}
-          {record && mod.id === 'surat' && (
+          {record && (
             <button type="button" className="btn ghost" onClick={() => printReceipt(mod, current())} title="Cetak tanda terima">
               <Printer size={16} /> <span className="hide-sm">Tanda terima</span>
             </button>

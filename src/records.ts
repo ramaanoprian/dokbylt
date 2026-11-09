@@ -1,6 +1,7 @@
 // Aturan bersama untuk satu data: judul, tahap berikutnya, dan isian wajib sebelum pindah tahap.
-import { stageNeeds, type ModuleDef } from './modules';
+import { stageNeeds, stagesOf, type ModuleDef } from './modules';
 import type { DocRecord } from './backend';
+import { shown } from './util';
 
 /** Kolom yang paling menggambarkan data; dipakai sebagai judul. */
 export const TITLE_KEYS = ['perihal', 'kegiatan', 'uraian', 'keperluan', 'tujuan', 'asal', 'pengirim'];
@@ -8,10 +9,17 @@ export const TITLE_KEYS = ['perihal', 'kegiatan', 'uraian', 'keperluan', 'tujuan
 export const titleOf = (mod: ModuleDef, r: DocRecord) =>
   TITLE_KEYS.map((k) => r.values[k]?.trim()).find(Boolean) || `${mod.itemName[0].toUpperCase()}${mod.itemName.slice(1)}`;
 
-/** Tahap sesudah tahap sekarang, atau kosong bila sudah di tahap terakhir. */
+/** Unit kerja penerima surat masuk: unit yang ditunjuk disposisi EVP untuk surat ke EVP, selain itu tujuannya. */
+export function suratUnit(mod: ModuleDef, v: Record<string, string>) {
+  const key = v.tujuan === 'EVP' && v.disposisiKepada ? 'disposisiKepada' : 'tujuan';
+  const f = mod.fields.find((x) => x.key === key);
+  return f ? shown(f, v) : '';
+}
+
+/** Tahap sesudah tahap sekarang menurut urutan tahap data ini, atau kosong bila sudah di tahap terakhir. */
 export function nextStatus(mod: ModuleDef, r: DocRecord) {
-  const i = mod.statuses.indexOf(r.status);
-  return i < mod.statuses.length - 1 ? mod.statuses[i + 1] : undefined;
+  const path = stagesOf(mod, r.values, r.status);
+  return path[path.indexOf(r.status) + 1];
 }
 
 /**

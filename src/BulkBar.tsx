@@ -3,7 +3,7 @@ import { ArrowRight, ChevronUp, FileSpreadsheet, X } from 'lucide-react';
 import type { ModuleDef } from './modules';
 import type { DocRecord } from './backend';
 import { stageClass } from './stats';
-import { isBehind } from './records';
+import { isBehind, nextStatus } from './records';
 
 interface Props {
   mod: ModuleDef;
@@ -29,8 +29,9 @@ export function BulkBar({ mod, selected, total, onSelectAll, onMove, onExport, o
 
   const statuses = new Set(list.map((r) => r.status));
   const shared = statuses.size === 1 ? list[0]?.status : undefined;
-  const sharedIdx = shared ? mod.statuses.indexOf(shared) : -1;
-  const next = shared && sharedIdx < mod.statuses.length - 1 ? mod.statuses[sharedIdx + 1] : undefined;
+  // Tahap berikutnya bila sama untuk semua yang dipilih (surat untuk EVP dan untuk unit bisa berbeda).
+  const nexts = new Set(list.map((r) => nextStatus(mod, r)));
+  const next = shared && nexts.size === 1 ? [...nexts][0] : undefined;
   const movable = (s: string) => list.filter((r) => isBehind(mod, r, s)).length;
 
   useEffect(() => {

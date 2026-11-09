@@ -4,6 +4,7 @@ import type { ModuleDef } from './modules';
 import type { DocRecord } from './backend';
 import { REMIND_DAYS, daysSince, daysUntil, deadlineOf, dueLabel, dueTone, fmtDate, lastMove, shown } from './util';
 import { stageClass } from './stats';
+import { nextStatus } from './records';
 
 interface Props {
   mod: ModuleDef;
@@ -62,6 +63,8 @@ export function Board({ mod, rows, onOpen, onMove, activeId }: Props) {
                 const age = daysSince(lastMove(r));
                 const due = deadlineOf(mod, r);
                 const dueDays = due ? daysUntil(due) : undefined;
+                // Surat untuk unit kerja melompati kolom disposisi EVP.
+                const next = nextStatus(mod, r);
                 return (
                   <article
                     key={r.id}
@@ -93,15 +96,15 @@ export function Board({ mod, rows, onOpen, onMove, activeId }: Props) {
                         i < last && age >= 3 && <span className="tag late">{age} hari</span>
                       )}
                     </div>
-                    {i < last && (
+                    {next && (
                       <button
                         className="kcard-next"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onMove(r, mod.statuses[i + 1]);
+                          onMove(r, next);
                         }}
                       >
-                        {mod.statuses[i + 1]} <ChevronRight size={14} />
+                        {next} <ChevronRight size={14} />
                       </button>
                     )}
                   </article>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronRight, Columns3, List, Paperclip, Plus, Search } from 'lucide-react';
-import type { ModuleDef } from './modules';
+import { stagesOf, type ModuleDef } from './modules';
 import { attachmentsOf, sendDroneNotify, type DocRecord, type NotifyKind, type NotifyResult } from './backend';
 import { cancelNotify, queueNotify } from './notifyQueue';
 import { DataMenu } from './DataMenu';
@@ -11,6 +11,7 @@ import { Icon } from './icons';
 import { RecordForm } from './RecordForm';
 import { RecordDetail } from './RecordDetail';
 import { BulkBar } from './BulkBar';
+import { SuratKpi } from './SuratKpi';
 import { FilterChip, monthLabel, monthOf, readSaring, unitFieldOf, writeSaring, type Saring } from './FilterBar';
 import { Board } from './Board';
 import { exportXlsx } from './excel';
@@ -505,6 +506,7 @@ export function ModulePage({
 
       <section className="page" data-mod={mod.id}>
         <Hero title={`${mod.title}.`} lead={mod.description} />
+        {mod.id === 'surat' && <SuratKpi mod={mod} rows={rows} loading={loading} />}
 
         <div className="ux-toolbar">
           <div className="controls">
@@ -676,7 +678,10 @@ export function ModulePage({
                 </thead>
                 <tbody>
                   {visible.map((r, ri) => {
-                    const idx = mod.statuses.indexOf(r.status);
+                    // Urutan tahap data ini: surat untuk unit tidak melalui disposisi EVP.
+                    const path = stagesOf(mod, r.values, r.status);
+                    const idx = path.indexOf(r.status);
+                    const next = path[idx + 1];
                     const done = isDone(mod, r);
                     const age = daysSince(lastMove(r));
                     const due = deadlineOf(mod, r);
@@ -740,8 +745,8 @@ export function ModulePage({
                         <td className="status-cell">
                           <span className="status-top">
                             <span className={'pill ' + stageClass(mod, r.status)}>{r.status}</span>
-                            <span className="steps" aria-label={`Tahap ${idx + 1} dari ${mod.statuses.length}`}>
-                              {mod.statuses.map((s, si) => (
+                            <span className="steps" aria-label={`Tahap ${idx + 1} dari ${path.length}`}>
+                              {path.map((s, si) => (
                                 <i key={s} className={si <= idx ? stageClass(mod, r.status) : ''} />
                               ))}
                             </span>
@@ -759,13 +764,13 @@ export function ModulePage({
                           )}
                         </td>
                         <td className="actions" onClick={(e) => e.stopPropagation()}>
-                          {!done && (
+                          {next && (
                             <button
                               className="btn small"
-                              onClick={() => moveTo(r, mod.statuses[idx + 1])}
-                              title={`Pindahkan ke ${mod.statuses[idx + 1]}`}
+                              onClick={() => moveTo(r, next)}
+                              title={`Pindahkan ke ${next}`}
                             >
-                              {mod.statuses[idx + 1]} <ChevronRight size={14} />
+                              {next} <ChevronRight size={14} />
                             </button>
                           )}
                         </td>
@@ -777,7 +782,10 @@ export function ModulePage({
               {/* Di HP data tampil sebagai daftar ringkas, bukan tabel. */}
               <ul className={'mlist' + (picking ? ' ux-picking' : '')}>
                 {visible.map((r, ri) => {
-                  const idx = mod.statuses.indexOf(r.status);
+                  // Urutan tahap data ini: surat untuk unit tidak melalui disposisi EVP.
+                  const path = stagesOf(mod, r.values, r.status);
+                  const idx = path.indexOf(r.status);
+                  const next = path[idx + 1];
                   const done = isDone(mod, r);
                   const age = daysSince(lastMove(r));
                   const due = deadlineOf(mod, r);
@@ -814,8 +822,8 @@ export function ModulePage({
                         {meta.length > 0 && <span className="mcard-meta">{meta.join(' · ')}</span>}
                         <span className="mcard-tags">
                           <span className={'pill ' + stageClass(mod, r.status)}>{r.status}</span>
-                          <span className="steps" aria-label={`Tahap ${idx + 1} dari ${mod.statuses.length}`}>
-                            {mod.statuses.map((s, si) => (
+                          <span className="steps" aria-label={`Tahap ${idx + 1} dari ${path.length}`}>
+                            {path.map((s, si) => (
                               <i key={s} className={si <= idx ? stageClass(mod, r.status) : ''} />
                             ))}
                           </span>
@@ -832,15 +840,15 @@ export function ModulePage({
                           )}
                         </span>
                       </div>
-                      {picking ? null : !done ? (
+                      {picking ? null : next ? (
                         <button
                           className="mcard-next"
                           onClick={(e) => {
                             e.stopPropagation();
-                            moveTo(r, mod.statuses[idx + 1]);
+                            moveTo(r, next);
                           }}
-                          aria-label={`Pindahkan ke ${mod.statuses[idx + 1]}`}
-                          title={mod.statuses[idx + 1]}
+                          aria-label={`Pindahkan ke ${next}`}
+                          title={next}
                         >
                           <ChevronRight size={18} />
                         </button>

@@ -299,6 +299,37 @@ ${head(2, 'Kinerja per menu', `Masuk dan selesai dalam ${esc(monthLabel(rep.peri
 </section>`;
 }
 
+function suratSection(rep: MonthReport) {
+  const k = rep.surat;
+  const timed = k.tepatWaktu + k.terlambat;
+  const share = (n: number, of: number) => (of ? `${nf(Math.round((n / of) * 100))}%` : '–');
+  const units = k.units
+    .map(
+      (u) =>
+        `<tr><th scope="row">${esc(u.unit)}</th><td class="num">${nf(u.masuk)}</td><td class="num">${nf(u.didistribusikan)}</td><td class="num">${nf(u.masuk - u.didistribusikan)}</td><td class="share"><span class="meter"><i style="width:${(u.didistribusikan / Math.max(1, u.masuk)) * 100}%"></i></span>${share(u.didistribusikan, u.masuk)}</td></tr>`,
+    )
+    .join('');
+  return `<section class="sec keep">
+${head(3, 'Surat masuk', `Surat dari luar yang diterima dalam ${esc(monthLabel(rep.period.month))} dan sudah didistribusikan ke unit kerja penerimanya.`)}
+<div class="stat-row">
+  <div><b>${nf(k.masuk)}</b><span>surat masuk</span></div>
+  <div><b>${nf(k.didistribusikan)}</b><span>didistribusikan (${share(k.didistribusikan, k.masuk)})</span></div>
+  <div><b>${nf(k.belum)}</b><span>belum didistribusikan${k.tungguEvp ? `, ${nf(k.tungguEvp)} menunggu disposisi EVP` : ''}</span></div>
+  <div><b>${share(k.tepatWaktu, timed)}</b><span>tepat waktu${k.terlambat ? `, ${nf(k.terlambat)} lewat tenggat` : ''}</span></div>
+</div>
+${
+  units
+    ? `<table class="tbl compact">
+<thead><tr><th>Unit kerja penerima</th><th class="num">Masuk</th><th class="num">Didistribusikan</th><th class="num">Belum</th><th>Persentase</th></tr></thead>
+<tbody>${units}</tbody>
+<tfoot><tr><th scope="row">Total</th><td class="num">${nf(k.masuk)}</td><td class="num">${nf(k.didistribusikan)}</td><td class="num">${nf(k.belum)}</td><td class="share">${share(k.didistribusikan, k.masuk)}</td></tr></tfoot>
+</table>
+<p class="facts"><span class="facts-head">Jalur surat</span><span>Langsung ke unit kerja <b>${nf(k.langsung)}</b></span><span>Melalui disposisi EVP <b>${nf(k.viaEvp)}</b></span></p>`
+    : empty('Tidak ada surat masuk pada periode ini.')
+}
+</section>`;
+}
+
 function evpSection(rep: MonthReport) {
   const evp = rep.mods.find((x) => x.m.id === 'evp')!;
   const units = rep.evpUnits
@@ -313,7 +344,7 @@ function evpSection(rep: MonthReport) {
     .join('');
   const stages = rep.evpStages.map((s) => `<span>${esc(s.status)} <b>${nf(s.count)}</b></span>`).join('');
   return `<section class="sec">
-${head(3, 'TTD EVP per unit', `Dokumen fisik yang butuh tanda tangan EVP, menurut unit asal.`)}
+${head(4, 'TTD EVP per unit', `Dokumen fisik yang butuh tanda tangan EVP, menurut unit asal.`)}
 ${
   units
     ? `<table class="tbl">
@@ -353,7 +384,7 @@ function lateSection(rep: MonthReport) {
   const open = rep.late.filter((x) => !x.doneDay).length;
   const done = rep.late.length - open;
   return `<section class="sec">
-${head(4, 'Lewat tenggat & selesai terlambat', `${nf(open)} belum selesai melewati tenggat dan ${nf(done)} selesai setelah tenggat. Urut dari yang paling lama.`)}
+${head(5, 'Lewat tenggat & selesai terlambat', `${nf(open)} belum selesai melewati tenggat dan ${nf(done)} selesai setelah tenggat. Urut dari yang paling lama.`)}
 ${
   rows
     ? `<table class="tbl">
@@ -382,7 +413,7 @@ function posSection(rep: MonthReport) {
     )
     .join('');
   return `<section class="sec">
-${head(5, 'Kantor Pos', 'Paket dari unit yang dikirim lewat Kantor Pos, menurut tanggal diterima dari unit.')}
+${head(6, 'Kantor Pos', 'Paket dari unit yang dikirim lewat Kantor Pos, menurut tanggal diterima dari unit.')}
 <div class="stat-row">
   <div><b>${nf(rows.length)}</b><span>paket diterima dari unit</span></div>
   <div><b>${nf(sent)}</b><span>sudah diambil kurir</span></div>
@@ -413,7 +444,7 @@ function mediaSection(rep: MonthReport) {
     )
     .join('');
   return `<section class="sec">
-${head(6, 'Multimedia', 'Kegiatan Balai Yasa Lahat yang didokumentasikan Unit Dokumen.')}
+${head(7, 'Multimedia', 'Kegiatan Balai Yasa Lahat yang didokumentasikan Unit Dokumen.')}
 <div class="stat-row three">
   <div><b>${nf(rows.length)}</b><span>kegiatan pada bulan ini</span></div>
   <div><b>${nf(covered)}</b><span>sudah diliput</span></div>
@@ -430,7 +461,7 @@ ${
 function otherSection(rep: MonthReport) {
   const { arsip, drone } = rep;
   return `<section class="sec keep">
-${head(7, 'Arsip & peminjaman drone', 'Layanan pendukung Unit Dokumen pada periode ini.')}
+${head(8, 'Arsip & peminjaman drone', 'Layanan pendukung Unit Dokumen pada periode ini.')}
 <div class="panels">
   <div class="panel"><h3>Arsip & depo arsip</h3>
     <div class="stat-row three"><div><b>${nf(arsip.masuk)}</b><span>penyerahan arsip</span></div><div><b>${nf(arsip.boxes)}</b><span>boks arsip</span></div><div><b>${nf(arsip.stored)}</b><span>sudah disimpan di depo</span></div></div>
@@ -454,7 +485,7 @@ function staffSection(rep: MonthReport) {
     )
     .join('');
   return `<section class="sec">
-${head(8, 'Aktivitas staf', 'Pencatatan, perpindahan tahap, perubahan, dan penghapusan data menurut akun yang mengerjakan.')}
+${head(9, 'Aktivitas staf', 'Pencatatan, perpindahan tahap, perubahan, dan penghapusan data menurut akun yang mengerjakan.')}
 ${
   body
     ? `<table class="tbl"><thead><tr><th>Nama</th><th class="num">Dicatat</th><th class="num">Dipindah tahap</th><th class="num">Diubah</th><th class="num">Dihapus</th><th class="num">Total</th><th>Menu terbanyak</th></tr></thead><tbody>${body}</tbody></table>`
@@ -470,6 +501,7 @@ const METHOD = [
   '<b>Berjalan</b> dan <b>lewat tenggat</b> adalah posisi pada akhir periode (atau saat laporan dibuat untuk bulan berjalan), disusun ulang dari riwayat tahap.',
   '<b>Rata-rata selesai</b> diukur dari dicatat sampai tahap terakhir. Data hasil impor Excel dan data yang langsung dicatat di tahap terakhir tidak dihitung.',
   '<b>Tepat waktu</b> membandingkan tanggal selesai dengan tenggat; hanya data yang punya tenggat dan bukan hasil impor.',
+  '<b>Surat masuk</b> dihitung dari tanggal diterima. <b>Didistribusikan</b> adalah surat bulan itu yang sudah sampai tahap Didistribusikan, ke tujuan suratnya atau ke unit yang ditunjuk disposisi EVP untuk surat ke EVP.',
 ];
 
 // ---------- Dokumen ----------
@@ -654,6 +686,7 @@ export function reportHtml(rep: MonthReport, meta: ReportMeta) {
 </div>
 ${summary(rep)}
 ${perModule(rep)}
+${suratSection(rep)}
 ${evpSection(rep)}
 ${lateSection(rep)}
 ${posSection(rep)}
