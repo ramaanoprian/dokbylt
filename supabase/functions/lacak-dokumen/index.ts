@@ -84,12 +84,23 @@ function info(kode: string, r: Row) {
   const done = r.status === m.statuses[m.statuses.length - 1];
   // Data bersifat rahasia (menu apa pun, mis. Surat Masuk atau Surat Keluar): perihal, jenis, dan tujuannya tidak ditampilkan.
   const secret = v.sifat === 'Rahasia';
-  const unit = secret || !m.unit ? '' : r.module === 'surat' ? pick(v, 'disposisiKepada') || pick(v, 'tujuan') : pick(v, m.unit);
+  // Surat untuk EVP diteruskan ke unit yang ditunjuk disposisi; surat lain langsung ke tujuannya.
+  const unit =
+    secret || !m.unit
+      ? ''
+      : r.module === 'surat' && v.tujuan === 'EVP'
+        ? pick(v, 'disposisiKepada') || pick(v, 'tujuan')
+        : pick(v, m.unit);
+  // Sama dengan stagesOf di src/modules.ts: surat yang tidak untuk EVP tidak melalui tahap disposisi.
+  const statuses =
+    r.module === 'surat' && v.tujuan !== 'EVP' && r.status !== 'Didisposisi EVP'
+      ? m.statuses.filter((s) => s !== 'Didisposisi EVP')
+      : m.statuses;
   return {
     kode,
     module: r.module,
     menu: m.menu,
-    statuses: m.statuses,
+    statuses,
     status: r.status,
     title: secret ? `${m.item} rahasia` : pick(v, m.title) || m.item,
     kind: !secret && r.module === 'evp' ? pick(v, 'jenis') || undefined : undefined,

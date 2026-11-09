@@ -391,3 +391,28 @@ html.ux-lock { overflow: hidden; }
   /* Menu layar penuh: beri ruang gulir agar tautan terbawah bisa naik di atas toast. */
   body:has(.toast-item) .gnav-sheet { padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* KPI bulanan di halaman Surat Masuk */
+.skpi-kpi .team-head { margin-top: 0; }
+.skpi-kpi .section-title { font-size: var(--fs-xl); }
+.skpi-month { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: var(--r-pill); background: var(--surface); box-shadow: var(--e1); }
+.skpi-month b { min-width: 9.5em; text-align: center; font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+.skpi-month .icon-btn { width: 32px; height: 32px; }
+.skpi-month .icon-btn:disabled { opacity: 0.3; cursor: default; }
+.skpi-kpi .kpis { margin-bottom: var(--sp-4); }
+.skpi-units { padding: var(--sp-5) var(--sp-6); margin-bottom: var(--sp-8); }
+.skpi-units-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; margin-bottom: 12px; font-size: var(--fs-sm); font-weight: 600; }
+.skpi-units-head .muted { font-weight: 400; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.skpi-units ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 32px; }
+.skpi-units li { display: grid; grid-template-columns: minmax(70px, 30%) minmax(0, 1fr) auto; align-items: center; gap: 12px; font-size: var(--fs-sm); }
+.skpi-unit { color: var(--text-2); }
+.skpi-bar { position: relative; height: 8px; border-radius: var(--r-pill); background: var(--fill-2); overflow: hidden; }
+.skpi-bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; transition: width var(--dur-4) var(--ease-standard); }
+.skpi-bar i.all { background: color-mix(in srgb, var(--accent, var(--s-done)) 28%, transparent); }
+.skpi-bar i.done { background: var(--accent, var(--s-done)); }
+.skpi-n { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.skpi-n b { color: var(--text); font-weight: 600; }
+@media (max-width: 734px) {
+  .skpi-kpi .team-head { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .skpi-units { padding: 16px 18px; }
+}

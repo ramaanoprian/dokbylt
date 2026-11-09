@@ -204,7 +204,7 @@ export function Overview({ data, activity, loading, go, onReport }: Props) {
                   <b>{st.thisMonth}</b> bulan ini
                 </span>
                 <span>
-                  <b>{st.doneThisMonth}</b> selesai
+                  <b>{st.doneThisMonth}</b> {m.doneLabel ?? 'selesai'}
                 </span>
                 <span>
                   <b>{st.avgFinish === undefined ? '–' : fmtDays(st.avgFinish)}</b> rata-rata

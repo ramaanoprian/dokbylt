@@ -5,6 +5,7 @@ import type { DocRecord } from './backend';
 import { fmtDate, shown } from './util';
 import { siteTrackUrl, trackCode } from './track';
 import { openOwnTab } from './ownTab';
+import { suratUnit } from './records';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -66,7 +67,7 @@ function parties(mod: ModuleDef, r: DocRecord): [string, string] {
     case 'evp':
       return [`Unit ${shown(mod.fields.find((f) => f.key === 'unit')!, v) || '…'}${v.pic ? ` (${v.pic})` : ''}`, 'Unit Dokumen'];
     case 'surat': {
-      const to = shown(mod.fields.find((f) => f.key === (v.disposisiKepada ? 'disposisiKepada' : 'tujuan'))!, v);
+      const to = suratUnit(mod, v);
       return ['Unit Dokumen', `${to || '…'}${v.penerima ? ` (${v.penerima})` : ''}`];
     }
     case 'keluar':

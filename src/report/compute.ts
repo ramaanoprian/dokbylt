@@ -2,6 +2,8 @@
 import { MODULES, UNITS, type ModuleDef, type ModuleId } from '../modules';
 import type { Activity, DataStore, DocRecord } from '../backend';
 import { finishDays } from '../stats';
+import { suratUnit } from '../records';
+import { suratKpi, type SuratKpi } from '../kpiSurat';
 import { isDone, shown } from '../util';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -105,9 +107,10 @@ function dueDone(m: ModuleDef, r: DocRecord) {
 export const labelOf = (v: Record<string, string>) =>
   v.perihal || v.kegiatan || v.uraian || v.keperluan || v.tujuan || v.asal || '';
 
-/** Unit yang berkaitan dengan data: unit asal/pembuat, atau tujuan untuk surat masuk. */
+/** Unit yang berkaitan dengan data: unit asal/pembuat, atau unit kerja penerima untuk surat masuk. */
 export function unitOf(m: ModuleDef, r: DocRecord) {
-  const f = m.fields.find((x) => x.key === 'unit') ?? (m.id === 'surat' ? m.fields.find((x) => x.key === 'tujuan') : undefined);
+  if (m.id === 'surat') return suratUnit(m, r.values);
+  const f = m.fields.find((x) => x.key === 'unit');
   return f ? shown(f, r.values) : '';
 }
 
@@ -232,6 +235,8 @@ export interface MonthReport {
   evpUnits: { unit: string; c: Core }[];
   evpJenis: { label: string; value: number }[];
   evpStages: { status: string; count: number }[];
+  /** KPI surat masuk: surat yang diterima bulan ini dan yang sudah didistribusikan ke unit kerja. */
+  surat: SuratKpi;
   late: LateItem[];
   pos: { rows: DocRecord[]; sent: number; resi: number; cost: number };
   media: { rows: DocRecord[]; covered: number; archived: number };
@@ -359,6 +364,7 @@ export function buildReport(data: DataStore, activity: Activity[], month: string
   const sortByDate = (m: ModuleDef) => (a: DocRecord, b: DocRecord) =>
     (a.values[m.dateField] ?? '').localeCompare(b.values[m.dateField] ?? '');
 
+  const surat = byId('surat');
   const pos = byId('pos');
   const posRows = data.pos.filter((r) => inMonth(pos, r)).sort(sortByDate(pos));
   const pickedAt = pos.statuses.indexOf('Di-pick up kurir');
@@ -382,6 +388,7 @@ export function buildReport(data: DataStore, activity: Activity[], month: string
     evpUnits,
     evpJenis,
     evpStages,
+    surat: suratKpi(surat, data.surat, p.month),
     late: late.sort((a, b) => Number(!!a.doneDay) - Number(!!b.doneDay) || b.days - a.days),
     pos: {
       rows: posRows,

@@ -1,5 +1,6 @@
 // Impor dan ekspor Excel. Pustaka dimuat saat dibutuhkan saja agar aplikasi tetap ringan.
-import { MODULES, OTHER, firstStatus, otherKey, type Field, type ModuleDef } from './modules';
+import { MODULES, OTHER, firstStatus, otherKey, stagesOf, type Field, type ModuleDef } from './modules';
+import { suratKpi } from './kpiSurat';
 import { newId, type DataStore, type DocRecord } from './backend';
 import { defaultDue, quoteList, shown, today } from './util';
 
@@ -66,7 +67,33 @@ export async function exportRekap(data: DataStore, month: string) {
     ],
     columns: [{ width: 24 }, { width: 12 }, { width: 12 }],
   };
-  await write([summary, ...sheets] as never).toFile(`rekap-dokumen-${month}.xlsx`);
+  // KPI surat masuk: jumlah surat masuk dan yang sudah didistribusikan ke unit kerja.
+  const surat = MODULES.find((m) => m.id === 'surat')!;
+  const k = suratKpi(surat, data.surat, month);
+  const bold = (value: string) => ({ value, fontWeight: 'bold' as const });
+  const row = (label: string, value: number) => [{ value: label, type: String }, { value, type: Number }];
+  const kpi = {
+    sheet: 'KPI Surat Masuk',
+    data: [
+      [bold('Ukuran'), bold('Jumlah')],
+      row('Surat masuk', k.masuk),
+      row('Sudah didistribusikan', k.didistribusikan),
+      row('Belum didistribusikan', k.belum),
+      row('Langsung ke unit kerja', k.langsung),
+      row('Melalui disposisi EVP', k.viaEvp),
+      row('Didistribusikan tepat waktu', k.tepatWaktu),
+      row('Didistribusikan lewat tenggat', k.terlambat),
+      [null],
+      [bold('Unit kerja penerima'), bold('Surat masuk'), bold('Didistribusikan')],
+      ...k.units.map((u) => [
+        { value: u.unit, type: String },
+        { value: u.masuk, type: Number },
+        { value: u.didistribusikan, type: Number },
+      ]),
+    ],
+    columns: [{ width: 30 }, { width: 14 }, { width: 16 }],
+  };
+  await write([summary, kpi, ...sheets] as never).toFile(`rekap-dokumen-${month}.xlsx`);
 }
 
 /** Cadangan lengkap: semua data semua menu, satu sheet per menu. */
@@ -225,7 +252,8 @@ export async function readImportFile(file: File, mod: ModuleDef, userName: strin
       if (due) values.tenggat = due;
     }
     const at = (values[mod.dateField] ?? today()) + 'T08:00:00+07:00';
-    const upto = mod.statuses.slice(0, mod.statuses.indexOf(status) + 1);
+    const path = stagesOf(mod, values, status);
+    const upto = path.slice(0, path.indexOf(status) + 1);
     records.push({
       id: newId(),
       status,

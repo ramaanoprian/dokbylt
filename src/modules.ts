@@ -14,6 +14,8 @@ export interface Field {
   hint?: string;
   /** Tanggal yang tidak diisi otomatis dengan hari ini saat data baru dibuat, mis. tanggal disposisi. */
   blank?: boolean;
+  /** Isian milik tahap yang tidak selalu dilalui: hanya tampil bila data melewati tahap ini. */
+  stage?: string;
 }
 
 export interface ModuleDef {
@@ -28,6 +30,10 @@ export interface ModuleDef {
   statuses: string[];
   /** Field yang wajib terisi sebelum masuk ke tahap tertentu. */
   requiredForStatus?: Record<string, string[]>;
+  /** Tahap yang hanya dilalui sebagian data; dilewati bila fungsinya bernilai salah (lihat stagesOf). */
+  stageWhen?: Record<string, (values: Record<string, string>) => boolean>;
+  /** Sebutan untuk data yang sudah di tahap terakhir pada ringkasan, bila bukan "selesai". */
+  doneLabel?: string;
   /** Field yang dipakai sebagai tanggal utama (untuk sortir). */
   dateField: string;
   /** Tenggat bawaan: sekian hari kerja setelah tanggal utama. Tetap bisa diubah di form. */
@@ -52,8 +58,13 @@ export const UNITS = ['Rencana', 'Logistik', 'Keuangan', 'SDM', 'Dokumen', 'Lain
 /** Unit yang biasa meminjam drone. */
 export const DRONE_UNITS = ['SDM', 'Quality Control', 'Fasilitas', 'Rencana', 'Logistik', 'Keuangan', 'Lainnya'];
 export const DRONE_STATUSES = ['Diajukan', 'Disetujui', 'Dipinjam', 'Dikembalikan'];
-/** Tahap surat masuk: dicatat, diberi disposisi oleh EVP, lalu diteruskan ke unit. */
+/**
+ * Tahap surat masuk: dicatat, lalu didistribusikan ke unit tujuan. Hanya surat yang ditujukan ke EVP
+ * melewati tahap disposisi EVP di tengahnya (lihat stageWhen pada menu surat).
+ */
 export const SURAT_STATUSES = ['Didata', 'Didisposisi EVP', 'Didistribusikan'];
+/** Tahap disposisi EVP; hanya dilalui surat masuk yang ditujukan ke EVP. */
+export const DISPOSISI = SURAT_STATUSES[1];
 /** Sifat surat pada lembar disposisi. */
 export const SIFAT_SURAT = ['Biasa', 'Segera', 'Rahasia', 'Penting'];
 export const POS_STATUSES = [
@@ -120,7 +131,7 @@ export const MODULES: ModuleDef[] = [
     title: 'Surat Masuk',
     menu: 'Surat Masuk',
     description:
-      'Surat dari luar yang masuk ke unit dokumen: didata, diberi disposisi oleh EVP, lalu didistribusikan ke unit sesuai disposisi.',
+      'Surat dari luar yang masuk ke unit dokumen: didata, lalu didistribusikan ke unit kerja tujuannya. Surat untuk EVP diberi disposisi dulu.',
     icon: 'surat',
     itemName: 'surat',
     dateField: 'tanggalTerima',
@@ -146,18 +157,23 @@ export const MODULES: ModuleDef[] = [
         type: 'select',
         options: UNITS,
         hint: 'Unit yang ditunjuk EVP pada lembar disposisi',
+        stage: 'Didisposisi EVP',
       },
-      { key: 'tanggalDisposisi', label: 'Tanggal disposisi', type: 'date', blank: true },
+      { key: 'tanggalDisposisi', label: 'Tanggal disposisi', type: 'date', blank: true, stage: 'Didisposisi EVP' },
       {
         key: 'isiDisposisi',
         label: 'Isi disposisi EVP',
         type: 'textarea',
         hint: 'Salin arahan EVP dari lembar disposisi, mis. “Tindak lanjuti dan laporkan hasilnya”.',
+        stage: 'Didisposisi EVP',
       },
       { key: 'penerima', label: 'Diterima oleh', type: 'text' },
       { key: 'catatan', label: 'Catatan', type: 'textarea' },
     ],
     statuses: SURAT_STATUSES,
+    // Surat untuk unit kerja langsung didistribusikan; disposisi EVP hanya untuk surat yang tujuannya EVP.
+    stageWhen: { [DISPOSISI]: (v) => v.tujuan === 'EVP' },
+    doneLabel: 'didistribusikan',
     requiredForStatus: { 'Didisposisi EVP': ['isiDisposisi', 'disposisiKepada'], Didistribusikan: ['penerima'] },
   },
   {
@@ -341,9 +357,35 @@ export const moduleById = (id: string) => MODULES.find((m) => m.id === id)!;
  * lama yang melompati tahap baru, mis. surat yang didistribusikan sebelum ada tahap disposisi EVP, tetap
  * bisa disunting tanpa mengarang isian yang tidak pernah ada.
  */
-export function stageNeeds(mod: ModuleDef, status: string, record?: { status: string; values: Record<string, string> }) {
-  const saved = record ? mod.statuses.indexOf(record.status) : -1;
-  return mod.statuses
-    .slice(0, mod.statuses.indexOf(status) + 1)
+export function stageNeeds(
+  mod: ModuleDef,
+  status: string,
+  record?: { status: string; values: Record<string, string> },
+  values = record?.values ?? {},
+) {
+  // Tahap yang tidak dilalui data ini (mis. disposisi EVP untuk surat ke unit) tidak menagih isiannya.
+  const path = stagesOf(mod, values, status, record?.status);
+  const saved = record ? path.indexOf(record.status) : -1;
+  return path
+    .slice(0, path.indexOf(status) + 1)
     .flatMap((s, i) => (mod.requiredForStatus?.[s] ?? []).filter((k) => i >= saved || !!record?.values[k]?.trim()));
 }
+
+/**
+ * Urutan tahap untuk satu data. Tahap di `stageWhen` dilewati bila tidak berlaku, mis. surat untuk unit
+ * kerja langsung dari Didata ke Didistribusikan. Tahap di `keep` (tahap data sekarang atau tahap tujuan)
+ * selalu ikut, agar data yang terlanjur di tahap itu tetap tampil di urutannya.
+ */
+export function stagesOf(mod: ModuleDef, values: Record<string, string> = {}, ...keep: (string | undefined)[]) {
+  const when = mod.stageWhen;
+  if (!when) return mod.statuses;
+  return mod.statuses.filter((s) => keep.includes(s) || !when[s] || when[s](values));
+}
+
+/** Surat masuk yang melalui disposisi EVP (tujuannya EVP, atau terlanjur di tahap disposisi). */
+export const viaDisposition = (mod: ModuleDef, values: Record<string, string>, status?: string) =>
+  mod.id === 'surat' && stagesOf(mod, values, status).includes(DISPOSISI);
+
+/** Isian milik tahap yang tidak dilalui data ini disembunyikan, mis. isian disposisi untuk surat ke unit. */
+export const fieldShown = (mod: ModuleDef, f: Field, values: Record<string, string>, status?: string) =>
+  !f.stage || stagesOf(mod, values, status).includes(f.stage);
